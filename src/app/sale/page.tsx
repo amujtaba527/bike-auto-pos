@@ -1,0 +1,166 @@
+'use client';
+
+import { Search, Plus, FileText, Edit, Trash } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { SaleRecord, Customer } from '@/types/types';
+
+export default function SalesPage() {
+  const router = useRouter();
+  const [sales, setSales] = useState<SaleRecord[]>([]);
+  const [search, setSearch] = useState('');
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [dateFilter, setDateFilter] = useState('all');
+
+  useEffect(() => {
+    const fetchSales = async () => {
+      try {
+        const res = await fetch('/api/sale');
+        const data = await res.json();
+        const rescust = await fetch('/api/customer');
+        const custdata = await rescust.json();
+        setCustomers(custdata);
+        setSales(data);
+      } catch (error) {
+        console.error('Error fetching sales:', error);
+      }
+    };
+    fetchSales();
+  }, []);
+
+  // Filter sales based on date
+  const filterSalesByDate = (sale: SaleRecord[]) => {
+    const now = new Date();
+    switch (dateFilter) {
+        case 'today':
+            return sale.filter(sale => {
+                const saleDate = new Date(sale.sale_date);
+                return saleDate.toDateString() === now.toDateString();
+            });
+        case 'week':
+            return sale.filter(sale => {
+                const saleDate = new Date(sale.sale_date);
+                const oneWeekAgo = new Date(now);
+                oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+                return saleDate >= oneWeekAgo && saleDate <= now;
+            });
+        case 'month':
+            return sale.filter(sale => {
+                const saleDate = new Date(sale.sale_date);
+                const oneMonthAgo = new Date(now);
+                oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
+                return saleDate >= oneMonthAgo && saleDate <= now;
+            });
+        default: // 'all'
+            return sale;
+    }
+};
+
+  const handleDeleteSale = async (id: number) => {
+    try {
+      if (!window.confirm('Are you sure you want to delete this sale?')) return;
+      await fetch(`/api/sale/${id}`, {
+        method: 'DELETE',
+      });
+      const refreshed = await fetch('/api/sale').then(r => r.json());
+      const salesArray = Array.isArray(refreshed) ? refreshed : refreshed.sales || [];
+      setSales(salesArray);
+    } catch (error) {
+      console.error('Error deleting sale:', error);
+    }
+  };
+ 
+  const formatCurrency = (amount: number): string => {
+    return new Intl.NumberFormat('en-PK', {
+      style: 'currency',
+      currency: 'PKR',
+    }).format(amount);
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-100 p-4 md:p-8 w-full max-w-screen-2xl mx-auto">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-8 gap-4">
+        <h1 className="text-3xl font-extrabold text-indigo-700 tracking-tight">Sales</h1>
+        <button
+          className="flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-2xl text-base font-semibold shadow-lg transition"
+          onClick={() => router.push('/sale/newsale')}
+        >
+          <Plus size={18} />
+          <span>New Sale</span>
+        </button>
+      </div>
+
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6 gap-4">
+        <div className="relative w-full md:max-w-md">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+          <input
+            type="text"
+            placeholder="Search by Invoice Number or Customer..."
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full pl-12 pr-4 py-3 border border-gray-200 rounded-xl bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-200 text-base"
+            value={search}
+          />
+        </div>
+        <div className="flex gap-3">
+        <select 
+                        className="border border-gray-200 rounded-xl px-4 py-3 text-base bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-200"
+                        value={dateFilter}
+                        onChange={(e) => setDateFilter(e.target.value)}
+                    >
+                        <option value="all">All Time</option>
+                        <option value="today">Today</option>
+                        <option value="week">This Week</option>
+                        <option value="month">This Month</option>
+                    </select>
+        </div>
+      </div>
+
+      <div className="overflow-x-auto bg-white border border-gray-200 rounded-2xl shadow-lg">
+        <table className="min-w-full text-base">
+          <thead className="bg-gradient-to-r from-indigo-50 to-blue-50 text-gray-600 font-semibold">
+            <tr>
+              <th className="px-4 py-3 text-left">Invoice</th>
+              <th className="px-4 py-3 text-left">Date</th>
+              <th className="px-4 py-3 text-left">Customer</th>
+              <th className="px-4 py-3 text-left">Total (PKR)</th>
+              <th className="px-4 py-3 text-left">Actions</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-100">
+            {filterSalesByDate(sales).filter((sale) => sale.invoice_number.toLowerCase().includes(search.toLowerCase()) || sale.customer_id.toString().toLowerCase().includes(search.toLowerCase())).map((sale) => (
+              <tr key={sale.id} className="hover:bg-gray-50">
+                <td className="px-4 py-3">#{sale.invoice_number}</td>
+                <td className="px-4 py-3">{sale.sale_date.slice(0, 10)}</td>
+                <td className="px-4 py-3">{customers.find((cust) => cust.id === sale.customer_id)?.name}</td>
+                <td className="px-4 py-3 font-semibold">{formatCurrency(sale.total_amount)}</td>
+                <td className="px-4 py-3 flex space-x-2">
+                  <button 
+                    className="text-gray-500 hover:text-gray-700" 
+                    title="View Invoice"
+                    onClick={() => router.push(`/sale/${sale.id}`)}
+                  >
+                    <FileText size={16} />
+                  </button>
+                  <button 
+                  className="text-gray-500 hover:text-gray-700" 
+                  title="Edit Invoice"
+                  onClick={() => router.push(`/sale/${sale.id}/edit`)}
+                  >
+                    <Edit size={16} />
+                  </button>
+                  <button 
+                  className="text-gray-500 hover:text-gray-700" 
+                  title="Delete Invoice"
+                  onClick={() => handleDeleteSale(sale.id)}
+                  >
+                    <Trash size={16} />
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
