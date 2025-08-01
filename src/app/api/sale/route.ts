@@ -45,12 +45,12 @@ export async function POST(req: Request) {
     for (const item of body.items) {
       const productCheck = await client.query(
         'SELECT stock, name FROM products WHERE id = $1',
-        [item.id]
+        [item.product_id]
       );
 
       if (productCheck.rows.length === 0) {
         await client.query('ROLLBACK');
-        return NextResponse.json({ error: `Product with ID ${item.id} not found` }, { status: 400 });
+        return NextResponse.json({ error: `Product with ID ${item.product_id} not found` }, { status: 400 });
       }
 
       const product = productCheck.rows[0];
@@ -60,31 +60,37 @@ export async function POST(req: Request) {
       }
     }
 
+    let sale_date;
+    if(!body.sale_date){
+      sale_date = new Date().toISOString().split('T')[0];
+    }else{
+      sale_date = body.sale_date;
+    }
+
     // Insert sale record
     const res = await client.query(
-      "INSERT INTO sales (invoice_number, customer_id, subtotal, discount, tax_amount, total_amount, amount_paid) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *", 
-      [body.invoice_number, body.customer_id, body.subtotal, body.discount, body.tax_amount, body.total_amount, amountPaid]
+      "INSERT INTO sales (invoice_number, customer_id, subtotal, discount, tax_amount, total_amount, amount_paid, sale_date) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *", 
+      [body.invoice_number, body.customer_id, body.subtotal, body.discount, body.tax_amount, body.total_amount, amountPaid, sale_date]
     );
     
     const sale = res.rows[0];
     const sale_id = sale.id;
-    const sale_date = new Date(sale.sale_date).toISOString().split('T')[0];
 
     // Insert sale items, update inventory, and calculate COGS
     let totalCOGS = 0;
     
     for (const item of body.items) {
-      const lineTotal = item.quantity * item.sale_price;
+      const lineTotal = item.quantity * item.price;
       // Insert sale item
       await client.query(
         "INSERT INTO sales_items (product_id, sale_id, quantity, unit_price, line_total) VALUES ($1, $2, $3, $4, $5)", 
-        [item.id, sale_id, item.quantity, item.sale_price, lineTotal]
+        [item.product_id, sale_id, item.quantity, item.price, lineTotal]
       );
       
       // Calculate COGS for this item
       const productResult = await client.query(
         'SELECT cost_price FROM products WHERE id = $1',
-        [item.id]
+        [item.product_id]
       );
       
       const costPrice = productResult.rows[0].cost_price;
@@ -94,7 +100,7 @@ export async function POST(req: Request) {
       // Update product stock
       await client.query(
         "UPDATE products SET stock = stock - $1 WHERE id = $2", 
-        [item.quantity, item.id]
+        [item.quantity, item.product_id]
       );
     }
 

@@ -61,18 +61,26 @@ export default function Dashboard() {
           expensesRes.json()
         ]);
 
-        setCustomers(Array.isArray(customersData) ? customersData : []);
-        setVendors(Array.isArray(vendorsData) ? vendorsData : []);
+        // Set customers and vendors first
+        const customersArray = Array.isArray(customersData) ? customersData : [];
+        const vendorsArray = Array.isArray(vendorsData) ? vendorsData : [];
+        
+        setCustomers(customersArray);
+        setVendors(vendorsArray);
         setExpenses(Array.isArray(expensesData) ? expensesData : []);
+        
+        // Now map sales with customer names using the local arrays
         setSales(Array.isArray(salesData) ? salesData.map((sale: SaleRecord) => {
-          const customer = customers.find((c: Customer) => c.id === sale.customer_id);
+          const customer = customersArray.find((c: Customer) => c.id === sale.customer_id);
           return {
             ...sale,
             customer_name: customer ? customer.name : 'Unknown Customer'
           };
         }) : []);
+        
+        // Map purchases with vendor names using the local arrays
         setPurchases(Array.isArray(purchasesData) ? purchasesData.map(purchase => {
-          const vendor = vendors.find((v: Vendor) => v.id === purchase.vendor_id);
+          const vendor = vendorsArray.find((v: Vendor) => v.id === purchase.vendor_id);
           return {
             ...purchase,
             vendor_name: vendor ? vendor.name : 'Unknown Vendor'

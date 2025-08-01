@@ -49,34 +49,42 @@ export async function POST(req: Request) {
       await client.query('ROLLBACK');
       return NextResponse.json({ error: "Vendor not found" }, { status: 404 });
     }
+
+    
+    let purchase_date;
+    if (!body.purchase_date) {
+      purchase_date = new Date().toISOString().split('T')[0];
+    } else {
+      purchase_date = body.purchase_date;
+    }
+    
     const amountPaid = body.total_amount;
     // Insert purchase record
     const res = await client.query(
-      "INSERT INTO purchases (invoice_number, vendor_id, subtotal, tax_amount, total_amount,amount_paid) VALUES ($1, $2, $3, $4, $5,$6) RETURNING *", 
-      [body.invoice_number, body.vendor_id, body.subtotal, body.tax_amount, body.total_amount,amountPaid]
+      "INSERT INTO purchases (invoice_number, vendor_id, subtotal, tax_amount, total_amount,amount_paid,purchase_date) VALUES ($1, $2, $3, $4, $5,$6,$7) RETURNING *", 
+      [body.invoice_number, body.vendor_id, body.subtotal, body.tax_amount, body.total_amount,amountPaid,purchase_date]
     );
     
     const purchase = res.rows[0];
     const purchase_id = purchase.id;
-    const purchase_date = new Date(purchase.purchase_date).toISOString().split('T')[0];
 
     // Insert purchase items and update inventory
     let totalInventoryCost = 0;
     for (const item of body.items) {
-      const line_total = item.stock * item.cost_price;
+      const line_total = item.quantity * item.cost_price;
       // Insert purchase item
       await client.query(
         "INSERT INTO purchase_items (product_id, purchase_id, quantity, unit_price, line_total) VALUES ($1, $2, $3, $4, $5)", 
-        [item.id, purchase_id, item.stock, item.cost_price, line_total]
+        [item.product_id, purchase_id, item.quantity, item.cost_price, line_total]
       );
       
-      const itemCost = item.stock * item.cost_price;
+      const itemCost = item.quantity * item.cost_price;
       totalInventoryCost += itemCost;
 
       // Update product stock and cost price
       await client.query(
         "UPDATE products SET stock = stock + $1, cost_price = $2 WHERE id = $3", 
-        [item.stock, item.cost_price, item.id]
+        [item.quantity, item.cost_price, item.product_id]
       );
     }
 
