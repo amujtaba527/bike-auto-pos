@@ -43,7 +43,7 @@ export default function Sidebar({ children, user }: SidebarProps) {
   const mainNavigation = useMemo(() => [
     { 
       id: "dashboard", 
-      href: "/", 
+      href: "/dashboard", 
       icon: Home, 
       text: "Dashboard" 
     },
@@ -145,7 +145,7 @@ export default function Sidebar({ children, user }: SidebarProps) {
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 11c1.656 0 3-1.344 3-3s-1.344-3-3-3-3 1.344-3 3 1.344 3 3 3zm0 2c-2.67 0-8 1.337-8 4v2a1 1 0 001 1h14a1 1 0 001-1v-2c0-2.663-5.33-4-8-4z" />
             </svg>
           </div>
-          <Link href="/" className="text-2xl font-extrabold text-gray-800 tracking-tight text-center">
+          <Link href="/dashboard" className="text-2xl font-extrabold text-gray-800 tracking-tight text-center">
             POS Admin
           </Link>
         </div>
