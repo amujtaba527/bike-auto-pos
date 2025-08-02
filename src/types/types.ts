@@ -87,6 +87,7 @@ export interface Expense {
 
 export interface Purchase {
     id: number;
+    invoice_number: string;
     vendor_id: number;
     total_amount: number;
     purchase_date: string;

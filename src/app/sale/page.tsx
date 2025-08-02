@@ -11,10 +11,12 @@ export default function SalesPage() {
   const [search, setSearch] = useState('');
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [dateFilter, setDateFilter] = useState('all');
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     const fetchSales = async () => {
       try {
+        setLoading(true);
         const res = await fetch('/api/sale');
         const data = await res.json();
         const rescust = await fetch('/api/customer');
@@ -23,6 +25,8 @@ export default function SalesPage() {
         setSales(data);
       } catch (error) {
         console.error('Error fetching sales:', error);
+      } finally {
+        setLoading(false);
       }
     };
     fetchSales();
@@ -127,11 +131,40 @@ export default function SalesPage() {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
-            {filterSalesByDate(sales).filter((sale) => sale.invoice_number.toLowerCase().includes(search.toLowerCase()) || sale.customer_id.toString().toLowerCase().includes(search.toLowerCase())).map((sale) => (
-              <tr key={sale.id} className="hover:bg-gray-50">
-                <td className="px-4 py-3">#{sale.invoice_number}</td>
-                <td className="px-4 py-3">{sale.sale_date.slice(0, 10)}</td>
-                <td className="px-4 py-3">{customers.find((cust) => cust.id === sale.customer_id)?.name}</td>
+            {loading ? (
+              <tr>
+                <td colSpan={6} className="px-4 py-8 text-center">
+                  <div className="flex justify-center">
+                    <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
+                  </div>
+                </td>
+              </tr>
+            ) : filterSalesByDate(sales).filter((sale) => {
+              const customerName = customers.find((cust) => cust.id === sale.customer_id)?.name?.toLowerCase() || '';
+              const searchTerm = search.toLowerCase();
+              
+              return sale.invoice_number.toLowerCase().includes(searchTerm) || 
+                     customerName.includes(searchTerm) || 
+                     sale.sale_date.includes(search);
+            }).length === 0 ? (
+              <tr>
+                <td colSpan={6} className="px-4 py-8 text-center text-gray-500">
+                  No sales found
+                </td>
+              </tr>
+            ) : (
+              filterSalesByDate(sales).filter((sale) => {
+                const customerName = customers.find((cust) => cust.id === sale.customer_id)?.name?.toLowerCase() || '';
+                const searchTerm = search.toLowerCase();
+                
+                return sale.invoice_number.toLowerCase().includes(searchTerm) || 
+                       customerName.includes(searchTerm) || 
+                       sale.sale_date.includes(search);
+              }).map((sale)=> (
+                <tr key={sale.id} className="hover:bg-gray-50">
+                  <td className="px-4 py-3">#{sale.invoice_number}</td>
+                  <td className="px-4 py-3">{sale.sale_date.slice(0, 10)}</td>
+                  <td className="px-4 py-3">{customers.find((cust) => cust.id === sale.customer_id)?.name}</td>
                 <td className="px-4 py-3 font-semibold">{formatCurrency(sale.total_amount)}</td>
                 <td className="px-4 py-3 flex space-x-2">
                   <button 
@@ -157,7 +190,7 @@ export default function SalesPage() {
                   </button>
                 </td>
               </tr>
-            ))}
+            )))}
           </tbody>
         </table>
       </div>

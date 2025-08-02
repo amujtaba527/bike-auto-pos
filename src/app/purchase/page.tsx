@@ -9,7 +9,9 @@ export default function PurchasesPage() {
   const router = useRouter();
   const [purchases, setPurchases] = useState<Purchase[]>([]);
   const [vendors, setVendors] = useState<Vendor[]>([]);
+  const [search, setSearch] = useState('');
   const [dateFilter, setDateFilter] = useState('all');
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     fetchPurchases();
@@ -17,6 +19,7 @@ export default function PurchasesPage() {
 
   const fetchPurchases = async () => {
     try {
+      setLoading(true);
       const res = await fetch('/api/purchase');
       const data = await res.json();
       const vendors = await fetch('/api/vendor');
@@ -25,6 +28,8 @@ export default function PurchasesPage() {
       setVendors(vendorsData);
     } catch (error) {
       console.error('Error fetching purchases:', error);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -89,7 +94,9 @@ const handleDeletePurchase = async (id: number) => {
           <input
             type="text"
             placeholder="Search by purchase ID or vendor..."
+            onChange={(e) => setSearch(e.target.value)}
             className="w-full pl-12 pr-4 py-3 border border-gray-200 rounded-xl bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-200 text-base"
+            value={search}
           />
         </div>
         <div className="flex gap-3">
@@ -110,7 +117,7 @@ const handleDeletePurchase = async (id: number) => {
         <table className="min-w-full text-base">
           <thead className="bg-gradient-to-r from-indigo-50 to-blue-50 text-gray-600 font-semibold">
             <tr>
-              <th className="px-4 py-3 text-left">Purchase ID</th>
+              <th className="px-4 py-3 text-left">Invoice Number</th>
               <th className="px-4 py-3 text-left">Date</th>
               <th className="px-4 py-3 text-left">Vendor</th>
               <th className="px-4 py-3 text-left">Total (PKR)</th>
@@ -118,9 +125,38 @@ const handleDeletePurchase = async (id: number) => {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
-            {filterPurchaseByDate(purchases).map((purchase) => (
+            {loading ? (
+              <tr>
+                <td colSpan={6} className="px-4 py-8 text-center">
+                  <div className="flex justify-center">
+                    <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
+                  </div>
+                </td>
+              </tr>
+            ) : filterPurchaseByDate(purchases).filter((purchase) => {
+              const vendorName = vendors.find((vendor) => vendor.id === purchase.vendor_id)?.name?.toLowerCase() || '';
+              const searchTerm = search.toLowerCase();
+              
+              return purchase.invoice_number.toLowerCase().includes(searchTerm) || 
+                     vendorName.includes(searchTerm) || 
+                     purchase.purchase_date.includes(search);
+            }).length === 0 ? (
+              <tr>
+                <td colSpan={6} className="px-4 py-8 text-center text-gray-500">
+                  No purchases found
+                </td>
+              </tr>
+            ) : (
+            filterPurchaseByDate(purchases).filter((purchase) => {
+              const vendorName = vendors.find((vendor) => vendor.id === purchase.vendor_id)?.name?.toLowerCase() || '';
+              const searchTerm = search.toLowerCase();
+              
+              return purchase.invoice_number.toLowerCase().includes(searchTerm) || 
+                     vendorName.includes(searchTerm) || 
+                     purchase.purchase_date.includes(search);
+            }).map((purchase) => (
               <tr key={purchase.id} className="hover:bg-gray-50">
-                <td className="px-4 py-3">#{purchase.id}</td>
+                <td className="px-4 py-3">#{purchase.invoice_number}</td>
                 <td className="px-4 py-3">{purchase.purchase_date.slice(0, 10)}</td>
                 <td className="px-4 py-3">{vendors.find(vendor => vendor.id === purchase.vendor_id)?.name}</td>
                 <td className="px-4 py-3 font-semibold">PKR {purchase.total_amount}</td>
@@ -148,7 +184,7 @@ const handleDeletePurchase = async (id: number) => {
                   </button>
                 </td>
               </tr>
-            ))}
+            )))}
           </tbody>
         </table>
       </div>

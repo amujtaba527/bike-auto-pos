@@ -161,7 +161,7 @@ const Products = () => {
 
   const filteredProducts = products.filter(product =>
     product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    product.sku.includes(searchQuery)
+    product.sku.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   return (
