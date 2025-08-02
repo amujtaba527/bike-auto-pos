@@ -221,46 +221,45 @@ const NewPurchase = () => {
             </div>
 
             {/* Vendor Selection */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">Vendor</label>
-              <div className="relative">
-                <input
-                  type="text"
-                  placeholder="Search vendor..."
-                  value={vendorSearchTerm || vendor?.name || ""}
-                  onChange={(e) => {
-                    setVendorSearchTerm(e.target.value);
-                    // Auto-select first matching vendor if exact match
-                    const exactMatch = filteredVendors.find((v: Vendor) => 
-                      v.name.toLowerCase() === e.target.value.toLowerCase()
-                    );
-                    if (exactMatch) {
-                      setVendor(exactMatch);
-                    }
-                  }}
-                  onFocus={() => setVendorSearchTerm("")}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-                {/* Vendor Suggestions Dropdown */}
-                {vendorSearchTerm && filteredVendors.length > 0 && (
-                  <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-48 overflow-y-auto">
-                    {filteredVendors.slice(0, 10).map((vendor) => (
-                      <div
-                        key={vendor.id}
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <h2 className="text-lg font-semibold text-gray-800 mb-4 flex">Vendor Selection</h2>
+            <div className="flex justify-between mb-4">
+            <div className="relative w-2/3">
+              <input
+                type="text"
+                placeholder="Search vendors..."
+                value={vendorSearchTerm}
+                onChange={(e) => setVendorSearchTerm(e.target.value)}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              {vendorSearchTerm && (
+                <div className="absolute top-full left-0 right-0 bg-white border border-gray-300 rounded-lg mt-1 max-h-48 overflow-y-auto z-10">
+                  {vendors
+                    .filter(v => v.name.toLowerCase().includes(vendorSearchTerm.toLowerCase()))
+                    .map(v => (
+                      <button
+                        key={v.id}
                         onClick={() => {
-                          setVendor(vendor);
+                          setVendor(v);
                           setVendorSearchTerm("");
                         }}
-                        className="px-3 py-2 hover:bg-gray-100 cursor-pointer border-b border-gray-100 last:border-b-0"
+                        className="w-full text-left px-4 py-2 hover:bg-gray-50 border-b border-gray-100 last:border-b-0"
                       >
-                        <div className="font-medium">{vendor.name}</div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
+                        {v.name}
+                      </button>
+                    ))
+                  }
+                </div>
+              )}
             </div>
-
+            {vendor && (
+              <div className="mt-3 p-3 bg-blue-50 rounded-lg">
+                <span className="text-sm text-blue-700">Selected: <strong>{vendor.name}</strong></span>
+              </div>
+            )}
+            </div>
+          </div>
+          
             {/* Product Search and Add */}
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
               <div className="flex gap-2 items-end">

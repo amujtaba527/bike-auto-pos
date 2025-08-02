@@ -4,7 +4,7 @@ import { pool } from "@/lib/db";
 // GET /api/expense - Get all expenses
 export async function GET() {
   try {
-    const res = await pool.query("SELECT * FROM expenses ORDER BY id ASC");
+    const res = await pool.query("SELECT * FROM expenses ORDER BY expense_date DESC");
     return NextResponse.json(res.rows);
   } catch (error) {
     return NextResponse.json({ error: "Error fetching expenses: " + error }, { status: 500 });

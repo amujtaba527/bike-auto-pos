@@ -1,5 +1,5 @@
-'use client';
-
+"use client";
+import { MinusIcon, PlusIcon } from "lucide-react";
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { use } from 'react';
@@ -48,6 +48,10 @@ const EditSale = ({ params }: { params: Promise<{ id: string }> }) => {
   const [products, setProducts] = useState<Product[]>([]);
   const [orderDiscount, setOrderDiscount] = useState<number>(0);
   const [orderDiscountType, setOrderDiscountType] = useState<'%' | 'PKR'>('PKR');
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedProductId, setSelectedProductId] = useState<number | null>(null);
+  const [tempQuantity, setTempQuantity] = useState<number>(1);
+  const [customerSearchTerm, setCustomerSearchTerm] = useState("");
   const [loading, setLoading] = useState(false);
   const [editLoading, setEditLoading] = useState(false);
   const [error, setError] = useState('');
@@ -112,24 +116,35 @@ const EditSale = ({ params }: { params: Promise<{ id: string }> }) => {
   }, [params]);
 
   const handleAddProduct = (productId: number) => {
-    const prod = allProducts.find(p => p.id === productId);
+    const prod = allProducts.find((p: Product) => p.id === productId);
     if (!prod) return;
     
-    // Check if product is already added
-    if (products.some(p => p.id === productId)) {
-      alert('Product already added');
-      return;
+    // Check if product already exists in cart
+    const existingProduct = products.find((p: Product) => p.id === productId);
+    if (existingProduct) {
+      // Update quantity if product already exists
+      setProducts(products.map((p: Product) => 
+        p.id === productId 
+          ? { ...p, quantity: p.quantity + tempQuantity }
+          : p
+      ));
+    } else {
+      // Add new product
+      const newProduct: Product = {
+        id: prod.id,
+        name: prod.name,
+        sku: prod.sku || '',
+        sale_price: prod.sale_price || 0,
+        stock: prod.stock || 0,
+        quantity: tempQuantity,
+      };
+      setProducts([...products, newProduct]);
     }
     
-    const newProduct: Product = {
-      id: prod.id,
-      name: prod.name,
-      sku: prod.sku || '',
-      sale_price: prod.sale_price || 0,
-      stock: prod.stock || 0,
-      quantity: 1,
-    };
-    setProducts([...products, newProduct]);
+    // Reset search and quantity
+    setSearchTerm("");
+    setSelectedProductId(null);
+    setTempQuantity(1);
   };
 
   const updateProduct = (id: number, field: keyof Product, value: number) => {
@@ -137,7 +152,7 @@ const EditSale = ({ params }: { params: Promise<{ id: string }> }) => {
   };
 
   const removeProduct = (id: number) => {
-    setProducts(products.filter(p => p.id !== id));
+    setProducts(products.filter((p: Product) => p.id !== id));
   };
 
   const subtotal = products.reduce((acc, p) =>
@@ -149,7 +164,7 @@ const EditSale = ({ params }: { params: Promise<{ id: string }> }) => {
       : orderDiscount;
   };
 
-  const tax = 0; // no tax for now
+  const tax = subtotal * 0.00; // 0% tax
   const grandTotal = subtotal - calcOrderDiscount() + tax;
 
   const handleUpdateSale = async () => {
@@ -221,177 +236,292 @@ const EditSale = ({ params }: { params: Promise<{ id: string }> }) => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-100 p-4 md:p-8 w-full max-w-screen-2xl mx-auto text-black">
-      {/* Header Card */}
-      <div className="bg-white/90 border border-gray-200 rounded-2xl mb-6 shadow p-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold mb-2 tracking-tight text-indigo-700">Edit Sale</h1>
-          <div className="flex gap-4 text-sm text-gray-500">
-            <span>Invoice: <span className="font-semibold text-gray-700">#{invoiceNumber}</span></span>
-            <span>Date: <span className="font-semibold text-gray-700">{date}</span></span>
+    <div className="min-h-screen bg-gray-50 p-4">
+      {/* Header */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-6 p-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-800">Edit Sale</h1>
+            <div className="flex items-center gap-4 mt-2 text-sm text-gray-600">
+              <span>Invoice: <span className="font-medium text-gray-800">#{invoiceNumber}</span></span>
+              <span>Date: <span className="font-medium text-gray-800">{date}</span></span>
+              <span>Customer: <span className="font-medium text-gray-800">{customer?.name || 'Not selected'}</span></span>
+            </div>
           </div>
-        </div>
-        <div className="flex gap-4 items-center">
           <button
-            className="flex items-center gap-2 border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 px-6 py-3 rounded-2xl font-semibold shadow transition-all"
             onClick={() => router.push('/sale')}
-            disabled={editLoading}
+            className="px-4 py-2 text-gray-600 hover:text-gray-800 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
           >
-            Back to Sales
+            ← Back to Sales
           </button>
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left: Customer and Product Selection */}
-        <div className="lg:col-span-2 flex flex-col gap-6">
-          {/* Customer Selection Card */}
-          <div className="bg-white border border-gray-200 rounded-2xl shadow p-6">
-            <h2 className="text-xl font-semibold text-gray-800 mb-4">Customer Information</h2>
-            <div className="flex flex-col sm:flex-row gap-4">
-              <select
-                value={customer?.id || ''}
-                onChange={(e) => {
-                  const selectedCustomer = customers.find(c => c.id === parseInt(e.target.value));
-                  setCustomer(selectedCustomer || null);
-                }}
-                className="flex-1 rounded-2xl border border-gray-200 bg-white px-5 py-3 text-base focus:outline-none focus:ring-2 focus:ring-indigo-200"
-              >
-                <option value="">Select Customer</option>
-                {customers.map((cust) => (
-                  <option key={cust.id} value={cust.id}>
-                    {cust.name}
-                  </option>
-                ))}
-              </select>
-              <div className="flex-1 px-5 py-3 bg-gray-50 rounded-2xl border border-gray-200 text-gray-600">
-                {customer ? customer.name : 'No customer selected'}
+        {/* Left Column - Product Management */}
+        <div className="lg:col-span-2 space-y-6">
+          {/* Customer Selection */}
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <h2 className="text-lg font-semibold text-gray-800 mb-4 flex">Customer Selection</h2>
+            <div className="flex justify-between mb-4">
+            <div className="relative w-2/3">
+              <input
+                type="text"
+                placeholder="Search customers..."
+                value={customerSearchTerm}
+                onChange={(e) => setCustomerSearchTerm(e.target.value)}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              {customerSearchTerm && (
+                <div className="absolute top-full left-0 right-0 bg-white border border-gray-300 rounded-lg mt-1 max-h-48 overflow-y-auto z-10">
+                  {customers
+                    .filter(c => c.name.toLowerCase().includes(customerSearchTerm.toLowerCase()))
+                    .map(c => (
+                      <button
+                        key={c.id}
+                        onClick={() => {
+                          setCustomer(c);
+                          setCustomerSearchTerm("");
+                        }}
+                        className="w-full text-left px-4 py-2 hover:bg-gray-50 border-b border-gray-100 last:border-b-0"
+                      >
+                        {c.name}
+                      </button>
+                    ))
+                  }
+                </div>
+              )}
+            </div>
+            {customer && (
+              <div className="mt-3 p-3 bg-blue-50 rounded-lg">
+                <span className="text-sm text-blue-700">Selected: <strong>{customer.name}</strong></span>
               </div>
+            )}
             </div>
           </div>
 
-          {/* Product Selection Card */}
-          <div className="bg-white border border-gray-200 rounded-2xl shadow p-6">
-            <h2 className="text-xl font-semibold text-gray-800 mb-4">Add Products</h2>
-            <div className="flex flex-col sm:flex-row gap-4 mb-4">
-              <select
-                onChange={(e) => handleAddProduct(parseInt(e.target.value))}
-                className="flex-1 rounded-2xl border border-gray-200 bg-white px-5 py-3 text-base focus:outline-none focus:ring-2 focus:ring-indigo-200"
-                defaultValue=""
-              >
-                <option value="" disabled>Add Product</option>
-                {allProducts
-                  .filter(p => !products.some(prod => prod.id === p.id))
-                  .map((product) => (
-                    <option key={product.id} value={product.id}>
-                      {product.name} (SKU: {product.sku}) - PKR {product.sale_price} (Stock: {product.stock})
-                    </option>
-                  ))}
-              </select>
-            </div>
-
-            {/* Products Table */}
-            <div className="overflow-x-auto">
-              <table className="min-w-full text-base">
-                <thead className="bg-gray-50 text-gray-600 font-semibold">
-                  <tr>
-                    <th className="px-4 py-3 text-left">Product</th>
-                    <th className="px-4 py-3 text-left">SKU</th>
-                    <th className="px-4 py-3 text-left">Price</th>
-                    <th className="px-4 py-3 text-left">Quantity</th>
-                    <th className="px-4 py-3 text-left">Stock</th>
-                    <th className="px-4 py-3 text-right">Total</th>
-                    <th className="px-4 py-3 text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200">
-                  {products.map((p) => (
-                    <tr key={p.id}>
-                      <td className="px-4 py-3">{p.name}</td>
-                      <td className="px-4 py-3">{p.sku}</td>
-                      <td className="px-4 py-3">PKR {p.sale_price}</td>
-                      <td className="px-4 py-3">
-                        <input
-                          type="number"
-                          min="1"
-                          max={p.stock + (products.find(prod => prod.id === p.id)?.quantity || 0)}
-                          value={p.quantity}
-                          onChange={(e) => updateProduct(p.id, 'quantity', parseInt(e.target.value) || 1)}
-                          className="w-20 rounded-2xl border border-gray-200 bg-white px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-indigo-200"
-                        />
-                      </td>
-                      <td className="px-4 py-3">{p.stock}</td>
-                      <td className="px-4 py-3 text-right font-semibold">
-                        PKR {(p.sale_price * p.quantity)}
-                      </td>
-                      <td className="px-4 py-3 text-right">
+          {/* Product Search & Add */}
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <h2 className="text-lg font-semibold text-gray-800 mb-4">Add Products</h2>
+            <div className="flex gap-3 mb-4">
+              <div className="flex-1 relative">
+                <input
+                  type="text"
+                  placeholder="Search products by name or SKU..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                {searchTerm && (
+                  <div className="absolute top-full left-0 right-0 bg-white border border-gray-300 rounded-lg mt-1 max-h-48 overflow-y-auto z-10">
+                    {allProducts
+                      .filter(p => 
+                        p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                        p.sku.toLowerCase().includes(searchTerm.toLowerCase())
+                      )
+                      .slice(0, 10)
+                      .map(product => (
                         <button
-                          type="button"
-                          onClick={() => removeProduct(p.id)}
-                          className="flex items-center gap-1 px-4 py-2 bg-red-100 text-red-600 hover:bg-red-200 hover:text-red-700 rounded-2xl font-semibold shadow transition"
-                          title="Remove"
+                          key={product.id}
+                          onClick={() => setSelectedProductId(product.id)}
+                          className={`w-full text-left px-4 py-3 hover:bg-gray-50 border-b border-gray-100 last:border-b-0 ${
+                            selectedProductId === product.id ? 'bg-blue-50' : ''
+                          }`}
                         >
-                          Remove
+                          <div className="flex justify-between items-center">
+                            <div>
+                              <div className="font-medium">{product.name}</div>
+                              <div className="text-sm text-gray-500">SKU: {product.sku} • Stock: {product.stock}</div>
+                            </div>
+                            <div className="text-right">
+                              <div className="font-medium">PKR {product.sale_price}</div>
+                            </div>
+                          </div>
                         </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                      ))
+                    }
+                  </div>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setTempQuantity(Math.max(1, tempQuantity - 1))}
+                  className="p-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+                  disabled={tempQuantity <= 1}
+                >
+                  <MinusIcon className="w-4 h-4" />
+                </button>
+                <input
+                  type="number"
+                  min="1"
+                  value={tempQuantity}
+                  onChange={(e) => setTempQuantity(Math.max(1, parseInt(e.target.value) || 1))}
+                  className="w-16 px-2 py-2 text-center border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <button
+                  onClick={() => setTempQuantity(tempQuantity + 1)}
+                  className="p-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+                >
+                  <PlusIcon className="w-4 h-4" />
+                </button>
+              </div>
+              <button
+                onClick={() => selectedProductId && handleAddProduct(selectedProductId)}
+                disabled={!selectedProductId}
+                className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+              >
+                Add
+              </button>
+            </div>
+          </div>
+
+          {/* Product List */}
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+            <div className="p-6 border-b border-gray-200">
+              <h2 className="text-lg font-semibold text-gray-800">Products in Sale</h2>
+            </div>
+            <div className="p-6">
+              {products.length === 0 ? (
+                <div className="text-center py-8 text-gray-500">
+                  No products added yet
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b border-gray-200">
+                        <th className="text-left py-3 px-4 font-medium text-gray-700">Product</th>
+                        <th className="text-left py-3 px-4 font-medium text-gray-700">SKU</th>
+                        <th className="text-center py-3 px-4 font-medium text-gray-700">Quantity</th>
+                        <th className="text-right py-3 px-4 font-medium text-gray-700">Price</th>
+                        <th className="text-right py-3 px-4 font-medium text-gray-700">Total</th>
+                        <th className="text-center py-3 px-4 font-medium text-gray-700">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {products.map((product) => (
+                        <tr key={product.id} className="border-b border-gray-100">
+                          <td className="py-4 px-4">
+                            <div className="font-medium text-gray-900">{product.name}</div>
+                            <div className="text-sm text-gray-500">Stock: {product.stock}</div>
+                          </td>
+                          <td className="py-4 px-4 text-gray-600">{product.sku}</td>
+                          <td className="py-4 px-4">
+                            <div className="flex items-center justify-center gap-2">
+                              <button
+                                onClick={() => updateProduct(product.id, 'quantity', Math.max(1, product.quantity - 1))}
+                                className="p-1 border border-gray-300 rounded hover:bg-gray-50"
+                                disabled={product.quantity <= 1}
+                              >
+                                <MinusIcon className="w-4 h-4" />
+                              </button>
+                              <input
+                                type="number"
+                                min="1"
+                                max={product.stock + product.quantity}
+                                value={product.quantity}
+                                onChange={(e) => updateProduct(product.id, 'quantity', Math.max(1, parseInt(e.target.value) || 1))}
+                                className="w-16 px-2 py-1 text-center border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              />
+                              <button
+                                onClick={() => updateProduct(product.id, 'quantity', product.quantity + 1)}
+                                className="p-1 border border-gray-300 rounded hover:bg-gray-50"
+                                disabled={product.quantity >= product.stock + product.quantity}
+                              >
+                                <PlusIcon className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </td>
+                          <td className="py-4 px-4 text-right font-medium">PKR {product.sale_price}</td>
+                          <td className="py-4 px-4 text-right font-semibold">PKR {(product.sale_price * product.quantity).toFixed(2)}</td>
+                          <td className="py-4 px-4 text-center">
+                            <button
+                              onClick={() => removeProduct(product.id)}
+                              className="text-red-600 hover:text-red-800 p-1"
+                              title="Remove item"
+                            >
+                              🗑️
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           </div>
         </div>
 
-        {/* Right: Summary Card */}
-        <div className="bg-white border border-gray-200 rounded-2xl shadow p-6 flex flex-col gap-4 h-fit">
-          <label className="font-semibold text-gray-700">Order Discount</label>
-          <div className="flex gap-2 items-center">
-            <input
-              type="number"
-              value={orderDiscount}
-              onChange={(e) => setOrderDiscount(Number(e.target.value) || 0)}
-              className="w-24 rounded-2xl border border-gray-200 bg-white px-5 py-3 text-base focus:outline-none focus:ring-2 focus:ring-indigo-200"
-              placeholder="0.00"
-            />
-            <select
-              value={orderDiscountType}
-              onChange={(e) => setOrderDiscountType(e.target.value as "%" | "PKR")}
-              className="rounded-2xl border border-gray-200 bg-white px-5 py-3 text-base focus:outline-none focus:ring-2 focus:ring-indigo-200"
-            >
-              <option value="PKR">PKR</option>
-              <option value="%">%</option>
-            </select>
+        {/* Right Column - Order Summary */}
+        <div className="space-y-4">
+          {/* Order Summary Card */}
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <h2 className="text-lg font-semibold text-gray-800 mb-4">Order Summary</h2>
+            
+            {/* Order Discount */}
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">Order Discount</label>
+              <div className="flex gap-2">
+                <input
+                  type="number"
+                  value={orderDiscount}
+                  onChange={(e) => setOrderDiscount(Number(e.target.value) || 0)}
+                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="0.00"
+                />
+                <select
+                  value={orderDiscountType}
+                  onChange={(e) => setOrderDiscountType(e.target.value as "%" | "PKR")}
+                  className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="PKR">PKR</option>
+                  <option value="%">%</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Summary Details */}
+            <div className="space-y-3 border-t border-gray-200 pt-4">
+              <div className="flex justify-between text-gray-600">
+                <span>Subtotal:</span>
+                <span className="font-medium">PKR {subtotal}</span>
+              </div>
+              <div className="flex justify-between text-gray-600">
+                <span>Tax:</span>
+                <span className="font-medium">PKR {tax}</span>
+              </div>
+              {orderDiscount > 0 && (
+                <div className="flex justify-between text-red-600">
+                  <span>Discount:</span>
+                  <span className="font-medium">-PKR {calcOrderDiscount()}</span>
+                </div>
+              )}
+              <div className="flex justify-between text-xl font-bold text-gray-900 border-t border-gray-200 pt-3">
+                <span>Total:</span>
+                <span className="text-green-600">PKR {grandTotal}</span>
+              </div>
+            </div>
           </div>
-          <h2 className="text-lg font-semibold text-gray-700 mb-2">Summary</h2>
-          <div className="flex flex-col gap-2">
-            <div className="flex justify-between text-gray-600">
-              <span>Subtotal:</span>
-              <span className="font-medium">PKR {subtotal.toFixed(2)}</span>
+
+          {/* Action Buttons */}
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <div className="space-y-3">
+              <button
+                onClick={handleUpdateSale}
+                className="w-full flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 text-white px-6 py-4 rounded-lg font-semibold text-lg transition-colors"
+                disabled={editLoading}
+              >
+                {editLoading ? "Updating..." : "Update Sale"}
+              </button>
+              <button
+                onClick={() => router.push('/sale')}
+                className="w-full flex items-center justify-center gap-2 bg-gray-600 hover:bg-gray-700 text-white px-6 py-4 rounded-lg font-semibold text-lg transition-colors"
+                disabled={editLoading}
+              >
+                Cancel
+              </button>
             </div>
-            <div className="flex justify-between text-gray-600">
-              <span>Order Discount:</span>
-              <span className="font-medium text-red-500">- PKR {calcOrderDiscount()}</span>
-            </div>
-            <div className="flex justify-between font-semibold text-lg">
-              <span>Grand Total:</span>
-              <span className="text-indigo-700">PKR {grandTotal.toFixed(2)}</span>
-            </div>
-          </div>
-          <div className="flex flex-col gap-2 mt-4">
-            <button
-              className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-indigo-600 to-blue-500 hover:from-indigo-700 hover:to-blue-600 text-white px-6 py-3 rounded-2xl font-semibold shadow-lg transition-all"
-              onClick={handleUpdateSale}
-              disabled={editLoading}
-            >
-              {editLoading ? 'Updating Sale...' : 'Update Sale'}
-            </button>
-            <button
-              className="w-full flex items-center justify-center gap-2 border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 px-6 py-3 rounded-2xl font-semibold shadow transition-all"
-              onClick={() => router.push('/sale')}
-              disabled={editLoading}
-            >
-              Cancel
-            </button>
           </div>
         </div>
       </div>

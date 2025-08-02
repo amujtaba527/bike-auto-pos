@@ -4,7 +4,7 @@ import { pool } from "@/lib/db";
 export async function GET() {
   try {
     // Fetch all sales
-    const res = await pool.query("SELECT * FROM sales ORDER BY id ASC");
+    const res = await pool.query("SELECT * FROM sales ORDER BY sale_date DESC");
     return NextResponse.json(res.rows);
   } catch (error) {
     return NextResponse.json({ error: "Error fetching sales" + error }, { status: 500 });

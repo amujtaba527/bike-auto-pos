@@ -3,7 +3,7 @@ import { pool } from "@/lib/db";
 
 export async function GET() {
   try {
-    const res = await pool.query("SELECT * FROM purchases ORDER BY id ASC");
+    const res = await pool.query("SELECT * FROM purchases ORDER BY purchase_date DESC");
     return NextResponse.json(res.rows);
   } catch (error) {
     return NextResponse.json({ error: "Error fetching purchases: " + error }, { status: 500 });
