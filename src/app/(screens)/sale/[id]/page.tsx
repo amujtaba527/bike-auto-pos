@@ -19,10 +19,8 @@ export default function SaleDetailPage({ params }: { params: Promise<{ id: strin
         // Fetch sale details
         const saleRes = await fetch(`/api/sale/${id}`);
         const saleData = await saleRes.json();
-        const itemsData = saleData.items;
-
+        
         setSale(saleData.sale);
-        setItems(itemsData);
 
         // Fetch customer
         const customerRes = await fetch(`/api/customer/${saleData.sale.customer_id}`);
@@ -30,11 +28,22 @@ export default function SaleDetailPage({ params }: { params: Promise<{ id: strin
         setCustomer(customerData);
 
         // Fetch products for items
+        const itemsRes = await fetch(`/api/sale_item/${id}`);
+        const itemsData = await itemsRes.json();
+        setItems(itemsData);
         if (itemsData.length > 0) {
           const productIds = itemsData.map((item: { product_id: number; }) => item.product_id);
           const productsRes = await fetch(`/api/product?ids=${productIds.join(',')}`);
           const productsData: Product[] = await productsRes.json();
-          setProducts(productsData);
+          // Merge price from itemsData into productsData
+          const mergedProducts = productsData.map((prod) => {
+            const item = itemsData.find((i: any) => i.product_id === prod.id);
+            return {
+              ...prod,
+              sale_price: item ? item.unit_price : prod.sale_price
+            };
+          });
+          setProducts(mergedProducts);
         }
 
         setLoading(false);

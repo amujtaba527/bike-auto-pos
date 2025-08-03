@@ -19,22 +19,33 @@ export default function PurchaseDetailPage({ params }: { params: Promise<{ id: s
         // Fetch purchase details
         const purchaseRes = await fetch(`/api/purchase/${id}`);
         const purchaseData = await purchaseRes.json();
-        const itemsData = purchaseData.items;
+        
 
         setPurchase(purchaseData.purchase);
-        setItems(itemsData);
 
         // Fetch vendor
         const vendorRes = await fetch(`/api/vendor/${purchaseData.purchase.vendor_id}`);
         const vendorData = await vendorRes.json();
         setVendor(vendorData);
 
+
         // Fetch products for items
+        const itemsRes = await fetch(`/api/purchase_item/${id}`);
+        const itemsData = await itemsRes.json();
+        setItems(itemsData);
         if (itemsData.length > 0) {
           const productIds = itemsData.map((item: { product_id: number; }) => item.product_id);
           const productsRes = await fetch(`/api/product?ids=${productIds.join(',')}`);
           const productsData: Product[] = await productsRes.json();
-          setProducts(productsData);
+          // Merge price from itemsData into productsData
+          const mergedProducts = productsData.map((prod) => {
+            const item = itemsData.find((i: any) => i.product_id === prod.id);
+            return {
+              ...prod,
+              sale_price: item ? item.unit_price : prod.sale_price
+            };
+          });
+          setProducts(mergedProducts);
         }
 
         setLoading(false);
