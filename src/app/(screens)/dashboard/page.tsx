@@ -12,7 +12,6 @@ import {SaleRecord, Purchase, Expense, Customer, Vendor} from '@/types/types';
 interface OverviewCardProps {
   title: string;
   value: number | string;
-  icon: React.ReactNode;
 }
 
 interface SaleWithCustomer extends SaleRecord {
@@ -154,17 +153,14 @@ export default function Dashboard() {
         <OverviewCard 
           title="Total Sales" 
           value={formatCurrency(totalSales)} 
-          icon={<ShoppingCart className="text-white" />} 
         />
         <OverviewCard 
           title="Total Purchases" 
           value={formatCurrency(totalPurchases)} 
-          icon={<ShoppingBag className="text-white" />} 
         />
         <OverviewCard 
           title="Total Expenses" 
           value={formatCurrency(totalExpenses)} 
-          icon={<Users className="text-white" />} 
         />
       </div>
 
@@ -234,17 +230,15 @@ export default function Dashboard() {
 }
 
 // Overview Card Component
-function OverviewCard({ title, value, icon }: OverviewCardProps) {
+function OverviewCard({ title, value }: OverviewCardProps) {
   return (
-    <div className="bg-white/90 backdrop-blur-lg border border-gray-200 rounded-2xl shadow-2xl p-6 flex flex-col gap-2">
+    <div className="bg-white/90 backdrop-blur-lg border border-gray-200 rounded-2xl shadow-2xl p-6 flex flex-col gap-2 overflow-auto">
       <div className="flex justify-between items-center mb-1">
         <div>
           <p className="text-sm font-semibold text-gray-500 mb-1">{title}</p>
           <p className="text-3xl font-extrabold text-gray-800">{value}</p>
         </div>
-        <div className="rounded-full bg-gradient-to-tr from-blue-600 to-indigo-400 p-3 shadow">
-          {icon}
-        </div>
+        
       </div>
     </div>
   );

@@ -14,6 +14,16 @@ export interface Vendor {
     address:string;
 }
 
+export interface Brand {
+    id: number;
+    name: string;
+}
+
+export interface Category {
+    id: number;
+    name: string;
+}
+
 export interface Product {
     id: number;
     sku: string;
@@ -21,6 +31,8 @@ export interface Product {
     description: string;
     cost_price: number;
     sale_price: number;
+    brand_id: number;
+    category_id: number;
     stock: number;
     min_stock_level: number;
 }
