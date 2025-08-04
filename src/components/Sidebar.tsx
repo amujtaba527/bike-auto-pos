@@ -64,6 +64,7 @@ export default function Sidebar({ children, user }: SidebarProps) {
       text: "Products",
       submenu: [
         { href: "/product", icon: Package, text: "Products" },
+        { href: "/product/categories", icon: Plus, text: "Category & Brand" },
         { href: "/product/demand", icon: RotateCcw, text: "Product Demand" }
       ]
     },

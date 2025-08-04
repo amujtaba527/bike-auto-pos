@@ -1,126 +1,161 @@
 'use client';
 import { Plus, Search, Pencil, Trash } from 'lucide-react';
-import React , { useEffect, useState } from 'react';
-import { Product } from '@/types/types';
+import React, { useEffect, useState } from 'react';
+import { Product, Brand, Category } from '@/types/types';
+import dynamic from "next/dynamic";
 
+const Select = dynamic(() => import('react-select'), { ssr: false });
 
 const Products = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
+  const [brands, setBrands] = useState<Brand[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [newProduct, setNewProduct] = useState({
     name: '',
     sku: '',
     description: '',
     cost_price: '',
     sale_price: '',
-    stock: '',
+    brand_id: '',
+    category_id: '',
     min_stock_level: '',
   });
   const [loading, setLoading] = useState(false);
 
-  // Inline editing state
-  const [editingProductId, setEditingProductId] = useState<number | null>(null);
-  const [editProduct, setEditProduct] = useState({
-    name: '',
-    sku: '',
-    cost_price: '',
-    sale_price: '',
-    stock: '',
-  });
-  const [editLoading, setEditLoading] = useState(false);
+  // --- Edit Mode State ---
+  const [isEditMode, setIsEditMode] = useState(false); // New state for mode
+  const [editingProductId, setEditingProductId] = useState<number | null>(null); // ID of the product being edited
+  const [editLoading, setEditLoading] = useState(false); // Use one loading state or separate if needed
 
+  // --- Unified handleEditClick ---
   const handleEditClick = (product: Product) => {
-    setEditingProductId(product.id);
-    setEditProduct({
+    // Populate the form fields with the selected product's data
+    setNewProduct({
       name: product.name,
       sku: product.sku,
+      description: product.description || '', // Ensure description is handled
       cost_price: product.cost_price.toString(),
       sale_price: product.sale_price.toString(),
-      stock: product.stock.toString(),
+      brand_id: product.brand_id.toString(),
+      category_id: product.category_id.toString(),
+      min_stock_level: product.min_stock_level.toString(),
     });
+    setIsEditMode(true); // Set mode to edit
+    setEditingProductId(product.id); // Store the ID of the product being edited
+    setShowAddModal(true); // Open the modal
   };
 
-  const handleEditInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setEditProduct({ ...editProduct, [e.target.name]: e.target.value });
-  };
+  // --- Unified handleAddProduct (handles Add & Edit) ---
+  const handleAddProduct = async (e: React.FormEvent) => {
+    e.preventDefault();
+    // Use appropriate loading state
+    if (isEditMode) {
+      setEditLoading(true);
+    } else {
+      setLoading(true);
+    }
 
-  const handleSaveEdit = async (id: number) => {
-    setEditLoading(true);
     try {
-      const res = await fetch(`/api/product/${id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: editProduct.name,
-          sku: editProduct.sku,
-          cost_price: Number(editProduct.cost_price),
-          sale_price: Number(editProduct.sale_price),
-          stock: Number(editProduct.stock),
-        }),
-      });
-      if (!res.ok) throw new Error('Failed to update product');
-      setEditingProductId(null);
-      setEditProduct({ name: '', sku: '', cost_price: '', sale_price: '', stock: '' });
-      // Refresh products
+      let res;
+      if (isEditMode && editingProductId !== null) {
+        // --- Edit Logic ---
+        res = await fetch(`/api/product/${editingProductId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: newProduct.name,
+            sku: newProduct.sku,
+            // description is omitted for edit
+            cost_price: Number(newProduct.cost_price),
+            sale_price: Number(newProduct.sale_price),
+            brand_id: Number(newProduct.brand_id),
+            category_id: Number(newProduct.category_id),
+            min_stock_level: Number(newProduct.min_stock_level),
+            // stock is not sent, so it won't be changed
+          }),
+        });
+        if (!res.ok) {
+          const errorData = await res.json().catch(() => ({}));
+          throw new Error(errorData.message || 'Failed to update product');
+        }
+      } else {
+        // --- Add Logic ---
+        res = await fetch('/api/product', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: newProduct.name,
+            sku: newProduct.sku,
+            description: newProduct.description, // Include description for add
+            cost_price: Number(newProduct.cost_price),
+            sale_price: Number(newProduct.sale_price),
+            brand_id: Number(newProduct.brand_id),
+            category_id: Number(newProduct.category_id),
+            min_stock_level: Number(newProduct.min_stock_level),
+          }),
+        });
+        if (!res.ok) {
+          const errorData = await res.json().catch(() => ({}));
+          throw new Error(errorData.message || 'Failed to add product');
+        }
+      }
+
+      // Close modal and reset states regardless of add/edit
+      handleCancelModal(); // Use the cancel function to reset everything
+
+      // Refresh products list
       const refreshed = await fetch('/api/product').then(r => r.json());
       const productsArray = Array.isArray(refreshed) ? refreshed : refreshed.products || [];
       setProducts(productsArray);
+
     } catch (err: unknown) {
-      alert((err as Error).message);
+      console.error("Error in handleAddProduct:", err);
+      alert((err as Error).message || (isEditMode ? 'An error occurred while updating the product.' : 'An error occurred while adding the product.'));
     } finally {
-      setEditLoading(false);
+      // Reset appropriate loading state
+      if (isEditMode) {
+        setEditLoading(false);
+      } else {
+        setLoading(false);
+      }
     }
   };
 
-  const handleDiscardEdit = () => {
+  // --- Unified Cancel/Discard Modal ---
+  const handleCancelModal = () => {
+    setShowAddModal(false);
+    setIsEditMode(false);
     setEditingProductId(null);
-    setEditProduct({ name: '', sku: '', cost_price: '', sale_price: '', stock: '' });
-  };
-
-  const handleDelete = async (id: number) => {
-    if (!window.confirm('Are you sure you want to delete this product?')) return;
-    setEditLoading(true);
-    try {
-      const res = await fetch(`/api/product/${id}`, {
-        method: 'DELETE',
-      });
-      if (!res.ok) throw new Error('Failed to delete product');
-      // Refresh products
-      const refreshed = await fetch('/api/product').then(r => r.json());
-      const productsArray = Array.isArray(refreshed) ? refreshed : refreshed.products || [];
-      setProducts(productsArray);
-    } catch (err: unknown) {
-      alert((err as Error).message);
-    } finally {
-      setEditLoading(false);
-    }
+    // Reset form data to initial empty state
+    setNewProduct({
+      name: '',
+      sku: '',
+      description: '',
+      cost_price: '',
+      sale_price: '',
+      brand_id: '',
+      category_id: '',
+      min_stock_level: '',
+    });
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setNewProduct({ ...newProduct, [e.target.name]: e.target.value });
   };
 
-  const handleAddProduct = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
+  const handleDelete = async (id: number) => {
+    if (!window.confirm('Are you sure you want to delete this product?')) return;
+    setEditLoading(true); // Use editLoading for delete too, or add another state
     try {
-      const res = await fetch('/api/product', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: newProduct.name,
-          sku: newProduct.sku,
-          cost_price: Number(newProduct.cost_price),
-          description: newProduct.description,
-          sale_price: Number(newProduct.sale_price),
-          stock: Number(newProduct.stock),
-          min_stock_level: Number(newProduct.min_stock_level),
-        }),
+      const res = await fetch(`/api/product/${id}`, {
+        method: 'DELETE',
       });
-      if (!res.ok) throw new Error('Failed to add product');
-      setShowAddModal(false);
-      setNewProduct({ name: '', sku: '', description: '', cost_price: '', sale_price: '', stock: '', min_stock_level: '' });
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.message || 'Failed to delete product');
+      }
       // Refresh products
       const refreshed = await fetch('/api/product').then(r => r.json());
       const productsArray = Array.isArray(refreshed) ? refreshed : refreshed.products || [];
@@ -128,7 +163,7 @@ const Products = () => {
     } catch (err: unknown) {
       alert((err as Error).message);
     } finally {
-      setLoading(false);
+      setEditLoading(false);
     }
   };
 
@@ -145,10 +180,20 @@ const Products = () => {
           sku: product.sku,
           cost_price: product.cost_price,
           sale_price: product.sale_price,
-          stock: product.stock,
+          brand_id: product.brand_id,
+          category_id: product.category_id,
           min_stock_level: product.min_stock_level,
+          stock: product.stock,
           description: product.description
         }));
+        const brandres = await fetch('api/brand');
+        const branddata = await brandres.json();
+        const brandsArray = Array.isArray(branddata) ? branddata : branddata.brands || [];
+        const categoryres = await fetch('api/category');
+        const categorydata = await categoryres.json();
+        const categoriesArray = Array.isArray(categorydata) ? categorydata : categorydata.categories || [];
+        setBrands(brandsArray);
+        setCategories(categoriesArray);
         setProducts(formatted);
       } catch (err: unknown) {
         alert("Error fetching products: " + (err as Error).message);
@@ -166,19 +211,48 @@ const Products = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-100 p-4 md:p-8 w-full max-w-screen-2xl mx-auto text-black">
-      {/* Add Product Modal */}
+      {/* Add/Edit Product Modal */}
       {showAddModal && (
         <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
           <div className="bg-white rounded-2xl shadow-xl p-8 w-full max-w-md relative">
             <button
               className="absolute top-3 right-3 text-gray-400 hover:text-gray-700 text-xl"
-              onClick={() => setShowAddModal(false)}
+              onClick={handleCancelModal} // Use cancel handler
               aria-label="Close"
             >
               &times;
             </button>
-            <h2 className="text-2xl font-bold mb-6 text-indigo-700">Add New Product</h2>
+            {/* Conditional Title */}
+            <h2 className="text-2xl font-bold mb-6 text-indigo-700">
+              {isEditMode ? 'Edit Product' : 'Add New Product'}
+            </h2>
             <form onSubmit={handleAddProduct} className="space-y-4">
+              {/* Brand Select */}
+              <label htmlFor="brand_id">Brand</label>
+              <Select
+                options={brands.map((brand: Brand) => ({ value: brand.id, label: brand.name }))}
+                placeholder="Select Brand"
+                // Ensure value is correctly set based on newProduct state
+                value={brands.find(b => b.id.toString() === newProduct.brand_id) ? { value: parseInt(newProduct.brand_id), label: brands.find(b => b.id.toString() === newProduct.brand_id)?.name } : null}
+                onChange={(selectedOption: any) => setNewProduct({ ...newProduct, brand_id: selectedOption?.value?.toString() || '' })}
+                className="w-full px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-200"
+                isDisabled={isEditMode && editLoading} // Disable during edit loading
+              />
+
+              {/* Category Select */}
+              <label htmlFor="category_id">Category</label>
+              <Select
+                options={categories.map((category: Category) => ({ value: category.id, label: category.name }))}
+                placeholder="Select Category"
+                // Ensure value is correctly set based on newProduct state
+                value={categories.find(c => c.id.toString() === newProduct.category_id) ? { value: parseInt(newProduct.category_id), label: categories.find(c => c.id.toString() === newProduct.category_id)?.name } : null}
+                onChange={(selectedOption: any) => setNewProduct({ ...newProduct, category_id: selectedOption?.value?.toString() || '' })}
+                className="w-full px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-200"
+                isDisabled={isEditMode && editLoading} // Disable during edit loading
+              />
+
+              {/* Product Name */}
+              <label htmlFor="name">Product Name</label>
               <input
                 type="text"
                 name="name"
@@ -187,15 +261,23 @@ const Products = () => {
                 onChange={handleInputChange}
                 required
                 className="w-full px-4 py-2 border rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-200"
+                disabled={isEditMode && editLoading} // Disable during edit loading
               />
+
+              {/* Description */}
+              <label htmlFor="description">Product Description</label>
               <input
-                type="text"
-                name="description"
-                placeholder="Product Description"
-                value={newProduct.description}
-                onChange={handleInputChange}
-                className="w-full px-4 py-2 border rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-200"
-              />
+                  type="text"
+                  name="description"
+                  placeholder="Product Description"
+                  value={newProduct.description}
+                  onChange={handleInputChange}
+                  className="w-full px-4 py-2 border rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-200"
+                  disabled={isEditMode && editLoading} // Shouldn't be needed, but good practice
+                />
+              
+              {/* SKU */}
+              <label htmlFor="sku">SKU</label>
               <input
                 type="text"
                 name="sku"
@@ -204,7 +286,11 @@ const Products = () => {
                 onChange={handleInputChange}
                 required
                 className="w-full px-4 py-2 border rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-200"
+                disabled={isEditMode && editLoading} // Disable during edit loading or if SKU shouldn't be editable
               />
+
+              {/* Cost Price */}
+              <label htmlFor="cost_price">Cost Price</label>
               <input
                 type="number"
                 name="cost_price"
@@ -213,8 +299,13 @@ const Products = () => {
                 onChange={handleInputChange}
                 required
                 min="0"
+                step="0.01" // Allow decimal prices
                 className="w-full px-4 py-2 border rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-200"
+                disabled={isEditMode && editLoading} // Disable during edit loading
               />
+
+              {/* Sale Price */}
+              <label htmlFor="sale_price">Sale Price</label>
               <input
                 type="number"
                 name="sale_price"
@@ -223,18 +314,13 @@ const Products = () => {
                 onChange={handleInputChange}
                 required
                 min="0"
+                step="0.01" // Allow decimal prices
                 className="w-full px-4 py-2 border rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-200"
+                disabled={isEditMode && editLoading} // Disable during edit loading
               />
-              <input
-                type="number"
-                name="stock"
-                placeholder="Stock"
-                value={newProduct.stock}
-                onChange={handleInputChange}
-                required
-                min="0"
-                className="w-full px-4 py-2 border rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-200"
-              />
+
+              {/* Min Stock Level */}
+              <label htmlFor="min_stock_level">Min Stock Level</label>
               <input
                 type="number"
                 name="min_stock_level"
@@ -244,33 +330,39 @@ const Products = () => {
                 required
                 min="0"
                 className="w-full px-4 py-2 border rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-200"
+                disabled={isEditMode && editLoading} // Disable during edit loading
               />
+
+              {/* Conditional Submit Button */}
               <button
                 type="submit"
-                className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-xl font-semibold transition flex items-center justify-center"
-                disabled={loading}
+                className={`w-full ${isEditMode ? 'bg-yellow-500 hover:bg-yellow-600' : 'bg-blue-600 hover:bg-blue-700'} text-white py-2 rounded-xl font-semibold transition flex items-center justify-center`}
+                disabled={loading || editLoading} // Disable based on loading state
               >
-                {loading ? 'Adding...' : 'Add Product'}
+                {isEditMode
+                  ? (editLoading ? 'Saving...' : 'Save Changes')
+                  : (loading ? 'Adding...' : 'Add Product')}
               </button>
             </form>
           </div>
         </div>
       )}
-
       <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-8 gap-4">
         <h1 className="text-3xl font-extrabold text-indigo-700 tracking-tight">Products</h1>
         <button
           className="flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-2xl text-base font-semibold shadow-lg transition"
-          onClick={() => setShowAddModal(true)}
+          onClick={() => {
+            handleCancelModal(); // Reset state before opening for Add
+            setShowAddModal(true);
+          }}
         >
           <Plus size={16} />
           <span>Add Product</span>
         </button>
       </div>
-
       <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6 gap-4">
         <div className="relative w-full md:max-w-md">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20}/>
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
           <input
             type="text"
             placeholder="Search products..."
@@ -280,7 +372,6 @@ const Products = () => {
           />
         </div>
       </div>
- 
       <div className="overflow-x-auto bg-white border border-gray-200 rounded-2xl shadow-lg">
         <table className="min-w-full text-base">
           <thead className="bg-gradient-to-r from-indigo-50 to-blue-50 text-gray-600 font-semibold">
@@ -289,15 +380,17 @@ const Products = () => {
               <th className="px-4 py-3 text-left">SKU</th>
               <th className="px-4 py-3 text-left">Product</th>
               <th className="px-4 py-3 text-left">Stock</th>
+              <th className="px-4 py-3 text-left">Brand</th>
+              <th className="px-4 py-3 text-left">Category</th>
               <th className="px-4 py-3 text-left">Cost Price (PKR)</th>
               <th className="px-4 py-3 text-left">Selling Price (PKR)</th>
               <th className="px-4 py-3 text-left">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
-            {loading ? (
+            {loading && !isEditMode && !editLoading ? ( // Show loading only for initial load/fetch, not edit/add
               <tr>
-                <td colSpan={6} className="px-4 py-8 text-center">
+                <td colSpan={9} className="px-4 py-8 text-center">
                   <div className="flex justify-center">
                     <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
                   </div>
@@ -305,96 +398,53 @@ const Products = () => {
               </tr>
             ) : filteredProducts.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-gray-500">
+                <td colSpan={9} className="px-4 py-8 text-center text-gray-500">
                   No products found
                 </td>
               </tr>
             ) : (
-            filteredProducts.map((product) => (
-              <tr key={product.id} className="hover:bg-gray-50">
-                <td className="px-4 py-3 font-semibold">{product.id}</td>
-                <td className="px-4 py-3 font-semibold">{product.sku}</td>
-                {editingProductId === product.id ? (
-                  <>
-                    <td className="px-4 py-3 font-semibold">
-                      <input
-                        type="text"
-                        name="name"
-                        value={editProduct.name}
-                        onChange={handleEditInputChange}
-                        className="w-full px-2 py-1 border rounded"
-                      />
-                    </td>
-                    <td className="px-4 py-3 font-semibold">
-                      <input
-                        type="number"
-                        name="stock"
-                        value={editProduct.stock}
-                        onChange={handleEditInputChange}
-                        className="w-full px-2 py-1 border rounded"
-                      />
-                    </td>
-                    <td className="px-4 py-3 font-semibold">
-                      <input
-                        type="number"
-                        name="cost_price"
-                        value={editProduct.cost_price}
-                        onChange={handleEditInputChange}
-                        className="w-full px-2 py-1 border rounded"
-                      />
-                    </td>
-                    <td className="px-4 py-3 font-semibold">
-                      <input
-                        type="number"
-                        name="sale_price"
-                        value={editProduct.sale_price}
-                        onChange={handleEditInputChange}
-                        className="w-full px-2 py-1 border rounded"
-                      />
-                    </td>
-                    <td className="px-4 py-3 flex gap-2">
-                      <button
-                        className="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded"
-                        onClick={() => handleSaveEdit(product.id)}
-                        disabled={editLoading}
-                      >
-                        Save
-                      </button>
-                      <button
-                        className="bg-gray-400 hover:bg-gray-500 text-white px-3 py-1 rounded"
-                        onClick={handleDiscardEdit}
-                        disabled={editLoading}
-                      >
-                        Discard
-                      </button>
-                    </td>
-                  </>
-                ) : (
-                  <>
-                    <td className="px-4 py-3 font-semibold">{product.name}</td>
-                    <td className="px-4 py-3">{product.stock}</td>
-                    <td className="px-4 py-3 font-semibold">PKR {product.cost_price.toLocaleString()}</td>
-                    <td className="px-4 py-3 font-semibold">PKR {product.sale_price.toLocaleString()}</td>
-                    <td className="px-4 py-3 flex gap-2">
-                      <button
-                        className="bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-1 rounded"
-                        onClick={() => handleEditClick(product)}
-                        disabled={!!editingProductId}
-                      >
-                        <Pencil size={16} />
-                      </button>
-                      <button
-                        className="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded"
-                        onClick={() => handleDelete(product.id)}
-                        disabled={editLoading || !!editingProductId}
-                      >
-                        <Trash size={16} />
-                      </button>
-                    </td>
-                  </>
-                )}
-              </tr>
-            )))}
+              filteredProducts.map((product) => (
+                <tr key={product.id} className="hover:bg-gray-50">
+                  <td className="px-4 py-3 font-semibold">{product.id}</td>
+                  <td className="px-4 py-3 font-semibold">{product.sku}</td>
+                  <td className="px-4 py-3 font-semibold">{product.name}</td>
+                  <td className="px-4 py-3 font-semibold">{product.stock}</td>
+                  <td className="px-4 py-3 font-semibold">{brands.find((b: Brand) => b.id === product.brand_id)?.name}</td>
+                  <td className="px-4 py-3 font-semibold">{categories.find((c: Category) => c.id === product.category_id)?.name}</td>
+                  <td className="px-4 py-3 font-semibold">{product.cost_price.toLocaleString()}</td>
+                  <td className="px-4 py-3 font-semibold">{product.sale_price.toLocaleString()}</td>
+                  <td className="px-4 py-3 flex gap-2">
+                    {/* Edit Button */}
+                    <button
+                      className={`p-2 rounded ${
+                        isEditMode || editLoading || loading // Disable if any operation is active
+                          ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                          : 'bg-yellow-500 hover:bg-yellow-600 text-white'
+                      }`}
+                      onClick={() => handleEditClick(product)}
+                      disabled={isEditMode || editLoading || loading} // Disable based on state
+                      aria-label="Edit"
+                    >
+                      <Pencil size={16} />
+                    </button>
+
+                    {/* Delete Button */}
+                    <button
+                      className={`p-2 rounded ${
+                        isEditMode || editLoading || loading // Disable if any operation is active
+                          ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                          : 'bg-red-600 hover:bg-red-700 text-white'
+                      }`}
+                      onClick={() => handleDelete(product.id)}
+                      disabled={isEditMode || editLoading || loading} // Disable based on state
+                      aria-label="Delete"
+                    >
+                      <Trash size={16} />
+                    </button>
+                  </td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
       </div>
