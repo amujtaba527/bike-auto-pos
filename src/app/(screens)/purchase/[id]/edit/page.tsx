@@ -111,6 +111,8 @@ const EditPurchase = ({ params }: PageProps) => {
         sale_price: prod.sale_price || 0,
         description: prod.description || '',
         min_stock_level: prod.min_stock_level || 0,
+        brand_id: prod.brand_id || 0,
+        category_id: prod.category_id || 0,
       };
       setProducts([...products, newProduct]);
     }
