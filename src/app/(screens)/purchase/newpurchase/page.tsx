@@ -1,8 +1,12 @@
 "use client";
-import { MinusIcon, PlusIcon } from "lucide-react";
+import { MinusIcon, PlusIcon, Edit, Trash, User } from "lucide-react";
 import React, { useState, useEffect } from "react";
 import { v4 as uuidv4 } from "uuid";
-import {Product, Vendor} from '@/types/types';
+import dynamic from "next/dynamic";
+import { Product, Vendor } from '@/types/types';
+
+// Dynamically import react-select to avoid SSR issues
+const Select = dynamic(() => import('react-select'), { ssr: false });
 
 const NewPurchase = () => {
   const [purchaseType, setPurchaseType] = useState<"Cash" | "Credit">("Cash");
@@ -17,66 +21,98 @@ const NewPurchase = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [orderDiscount, setOrderDiscount] = useState<number>(0);
   const [orderDiscountType, setOrderDiscountType] = useState<"%" | "PKR">("PKR");
-  const [searchTerm, setSearchTerm] = useState("");
-  const [selectedProductId, setSelectedProductId] = useState<number | null>(null);
+  
+  // State for react-select
+  const [selectedVendorOption, setSelectedVendorOption] = useState<any>(null);
+  const [selectedProductOption, setSelectedProductOption] = useState<any>(null);
+  const [editingProductId, setEditingProductId] = useState<number | null>(null);
+
+  // Temp state for new/edited product
   const [tempQuantity, setTempQuantity] = useState<number>(1);
   const [tempCostPrice, setTempCostPrice] = useState<number>(0);
+  const [tempTotal, setTempTotal] = useState<number>(0);
+
   const [loading, setLoading] = useState(false);
-  const [vendorSearchTerm, setVendorSearchTerm] = useState("");
+
+  // Calculate tempTotal when rate or quantity changes
+  useEffect(() => {
+    setTempTotal(tempCostPrice * tempQuantity);
+  }, [tempCostPrice, tempQuantity]);
 
   // Fetch vendors and products on mount
   useEffect(() => {
-    fetch('/api/vendor')
-      .then(res => res.json())
-      .then(data => {
-        const vendorList = Array.isArray(data) ? data : data.vendors || [];
-        setVendors(vendorList);
-        // Set default vendor to "Walk In" (ID: 1)
-        const walkInVendor = vendorList.find((v: Vendor) => v.id === 1);
-        if (walkInVendor) {
-          setVendor(walkInVendor);
-        }
-      });
-    fetch('/api/product')
-      .then(res => res.json())
-      .then(data => setAllProducts(Array.isArray(data) ? data : data.products || []));
+    Promise.all([
+      fetch('/api/vendor').then(res => res.json()),
+      fetch('/api/product').then(res => res.json())
+    ])
+    .then(([vendorData, productData]) => {
+      const vendorList = Array.isArray(vendorData) ? vendorData : vendorData.vendors || [];
+      const productList = Array.isArray(productData) ? productData : productData.products || [];
+      
+      setVendors(vendorList);
+      setAllProducts(productList);
+
+      // Set default vendor to "Walk In" (ID: 1)
+      const walkInVendor = vendorList.find((v: Vendor) => v.id === 1);
+      if (walkInVendor) {
+        setVendor(walkInVendor);
+        setSelectedVendorOption({
+          value: walkInVendor.id,
+          label: walkInVendor.name,
+          ...walkInVendor
+        });
+      }
+    })
+    .catch(err => {
+      console.error("Failed to fetch initial data:", err);
+    });
   }, []);
 
   const handleAddProduct = (productId: number) => {
     const prod = allProducts.find((p: Product) => p.id === productId);
     if (!prod) return;
-    
-    // Check if product already exists in cart
-    const existingProduct = products.find((p: Product) => p.id === productId);
-    if (existingProduct) {
-      // Update quantity if product already exists
-      setProducts(products.map((p: Product) => 
-        p.id === productId 
-          ? { ...p, stock: p.stock + tempQuantity }
+
+    if (editingProductId) {
+      // Update existing product in cart
+      setProducts(products.map((p: Product) =>
+        p.id === editingProductId
+          ? { ...p, stock: tempQuantity, cost_price: tempCostPrice }
           : p
       ));
+      setEditingProductId(null);
     } else {
-      // Add new product
-      const newProduct: Product = {
-        id: prod.id,
-        name: prod.name,
-        sku: prod.sku || '',
-        cost_price: tempCostPrice || prod.cost_price || 0,
-        stock: tempQuantity,
-        sale_price: prod.sale_price || 0,
-        description: prod.description || '',
-        min_stock_level: prod.min_stock_level || 0,
-        brand_id: prod.brand_id || 0,
-        category_id: prod.category_id || 0,
-      };
-      setProducts([...products, newProduct]);
+      // Check if product already exists in cart
+      const existingProduct = products.find((p: Product) => p.id === productId);
+      if (existingProduct) {
+        // Update quantity if product already exists
+        setProducts(products.map((p: Product) =>
+          p.id === productId
+            ? { ...p, stock: p.stock + tempQuantity }
+            : p
+        ));
+      } else {
+        // Add new product
+        const newProduct: Product = {
+          id: prod.id,
+          name: prod.name,
+          sku: prod.sku || '',
+          cost_price: tempCostPrice || prod.cost_price || 0,
+          stock: tempQuantity,
+          sale_price: prod.sale_price || 0,
+          description: prod.description || '',
+          min_stock_level: prod.min_stock_level || 0,
+          brand_id: prod.brand_id || 0,
+          category_id: prod.category_id || 0,
+        };
+        setProducts([...products, newProduct]);
+      }
     }
-    
+
     // Reset search and values
-    setSearchTerm("");
-    setSelectedProductId(null);
+    setSelectedProductOption(null);
     setTempQuantity(1);
     setTempCostPrice(0);
+    setTempTotal(0);
   };
 
   const updateProduct = (id: number, field: keyof Product, value: number) => {
@@ -110,7 +146,6 @@ const NewPurchase = () => {
         alert('Please add at least one product');
         return;
       }
-      
       const payload = {
         vendor_id: vendor.id,
         invoice_number: invoiceNumber,
@@ -123,7 +158,6 @@ const NewPurchase = () => {
           cost_price: product.cost_price,
         })),
       };
-      
       const res = await fetch('/api/purchase', {
         method: 'POST',
         headers: {
@@ -131,18 +165,29 @@ const NewPurchase = () => {
         },
         body: JSON.stringify(payload),
       });
-      
       if (!res.ok) {
         const errorData = await res.json();
         throw new Error(errorData.error || 'Failed to add purchase');
       }
-      
       alert('Purchase added successfully');
       // Reset form
       setProducts([]);
       setOrderDiscount(0);
       setOrderDiscountType('PKR');
       setInvoiceNumber(`PUR-${uuidv4().slice(0, 8)}`);
+      // Reset vendor selection
+      const walkInVendor = vendors.find((v: Vendor) => v.id === 1);
+      if (walkInVendor) {
+        setVendor(walkInVendor);
+        setSelectedVendorOption({
+          value: walkInVendor.id,
+          label: walkInVendor.name,
+          ...walkInVendor
+        });
+      } else {
+        setVendor(null);
+        setSelectedVendorOption(null);
+      }
     } catch (err: unknown) {
       console.error('Error adding purchase:', err);
       alert((err as Error).message || 'An error occurred while adding the purchase');
@@ -150,17 +195,6 @@ const NewPurchase = () => {
       setLoading(false);
     }
   };
-
-  // Filter products based on search term
-  const filteredProducts = allProducts.filter((product: Product) =>
-    product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    product.sku.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  // Filter vendors based on search term
-  const filteredVendors = vendors.filter((vendor: Vendor) =>
-    vendor.name.toLowerCase().includes(vendorSearchTerm.toLowerCase())
-  );
 
   return (
     <div className="min-h-screen bg-gray-50 p-4">
@@ -174,11 +208,10 @@ const NewPurchase = () => {
                 <div className="text-sm text-gray-600">Order Summary</div>
                 <div className="text-sm font-semibold">{products.length} items</div>
               </div>
-              <button 
+              <button
                 onClick={() => {
                   setProducts([]);
                   setOrderDiscount(0);
-                  setSearchTerm("");
                 }}
                 className="flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:text-red-800 border border-red-200 rounded-lg"
               >
@@ -188,7 +221,6 @@ const NewPurchase = () => {
             </div>
           </div>
         </div>
-
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Left Column - Product Entry and List */}
           <div className="lg:col-span-2 space-y-4">
@@ -223,45 +255,33 @@ const NewPurchase = () => {
             </div>
 
             {/* Vendor Selection */}
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-            <h2 className="text-lg font-semibold text-gray-800 mb-4 flex">Vendor Selection</h2>
-            <div className="flex justify-between mb-4">
-            <div className="relative w-2/3">
-              <input
-                type="text"
-                placeholder="Search vendors..."
-                value={vendorSearchTerm}
-                onChange={(e) => setVendorSearchTerm(e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-              {vendorSearchTerm && (
-                <div className="absolute top-full left-0 right-0 bg-white border border-gray-300 rounded-lg mt-1 max-h-48 overflow-y-auto z-10">
-                  {vendors
-                    .filter(v => v.name.toLowerCase().includes(vendorSearchTerm.toLowerCase()))
-                    .map(v => (
-                      <button
-                        key={v.id}
-                        onClick={() => {
-                          setVendor(v);
-                          setVendorSearchTerm("");
-                        }}
-                        className="w-full text-left px-4 py-2 hover:bg-gray-50 border-b border-gray-100 last:border-b-0"
-                      >
-                        {v.name}
-                      </button>
-                    ))
-                  }
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+              <h2 className="text-lg font-semibold text-gray-800 mb-4">Vendor Selection</h2>
+              <div className="flex justify-between mb-4">
+                <div className="w-2/3">
+                  <Select
+                    options={vendors.map(vendor => ({
+                      value: vendor.id,
+                      label: vendor.name,
+                      ...vendor
+                    }))}
+                    value={selectedVendorOption}
+                    onChange={(option: any) => {
+                      if (!option) return;
+                      setSelectedVendorOption(option);
+                      setVendor(option);
+                    }}
+                    placeholder="Search or select a vendor..."
+                    isSearchable
+                    classNamePrefix="react-select"
+                  />
                 </div>
-              )}
-            </div>
-            {vendor && (
-              <div className="mt-3 p-3 bg-blue-50 rounded-lg">
-                <span className="text-sm text-blue-700">Selected: <strong>{vendor.name}</strong></span>
+                <div className="flex-1 flex items-center justify-center">
+                <User size={60} className="text-blue-400" />
+                </div>
               </div>
-            )}
             </div>
-          </div>
-          
+
             {/* Product Search and Add */}
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
               <div className="flex gap-2 items-end">
@@ -269,44 +289,40 @@ const NewPurchase = () => {
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Product Name / SKU / Barcode
                   </label>
-                  <input
-                    type="text"
-                    placeholder="Type product name, SKU, UPC, or scan barcode..."
-                    value={searchTerm}
-                    onFocus={() => setSearchTerm('')}
-                    onChange={(e) => {
-                      setSearchTerm(e.target.value);
-                      // Auto-select first product if exact match
-                      const exactMatch = filteredProducts.find((p: Product) => 
-                        p.name.toLowerCase() === e.target.value.toLowerCase() ||
-                        p.sku.toLowerCase() === e.target.value.toLowerCase()
-                      );
-                      setSelectedProductId(exactMatch?.id || filteredProducts[0]?.id || null);
-                      if (exactMatch) {
-                        setTempCostPrice(exactMatch.cost_price || 0);
-                      }
+                  <Select
+                    options={allProducts.map(product => ({
+                      value: product.id,
+                      label: `${product.name} (SKU: ${product.sku}, Cost: PKR ${product.cost_price})`,
+                      ...product
+                    }))}
+                    value={selectedProductOption}
+                    onChange={(option: any) => {
+                      if (!option) return;
+                      setSelectedProductOption(option);
+                      // Pre-fill cost price from selected product
+                      const costPrice = option.cost_price || 0;
+                      setTempCostPrice(costPrice);
+                      setTempQuantity(1);
+                      setTempTotal(costPrice);
                     }}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Search or select a product..."
+                    isSearchable
+                    classNamePrefix="react-select"
                   />
-                  {/* Product Suggestions Dropdown */}
-                  {searchTerm && filteredProducts.length > 0 && (
-                    <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-48 overflow-y-auto">
-                      {filteredProducts.slice(0, 10).map((product) => (
-                        <div
-                          key={product.id}
-                          onClick={() => {
-                            setSearchTerm(product.name);
-                            setSelectedProductId(product.id);
-                            setTempCostPrice(product.cost_price || 0);
-                          }}
-                          className="px-3 py-2 hover:bg-gray-100 cursor-pointer border-b border-gray-100 last:border-b-0"
-                        >
-                          <div className="font-medium">{product.name}</div>
-                          <div className="text-sm text-gray-500">SKU: {product.sku} | Cost: PKR {product.cost_price}</div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
+                </div>
+                <div className="w-20">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Rate</label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={tempCostPrice}
+                    onChange={(e) => {
+                      const value = parseFloat(e.target.value) || 0;
+                      setTempCostPrice(value);
+                    }}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-center"
+                  />
                 </div>
                 <div className="w-20">
                   <label className="block text-sm font-medium text-gray-700 mb-2">Qty</label>
@@ -314,27 +330,29 @@ const NewPurchase = () => {
                     type="number"
                     min="1"
                     value={tempQuantity}
-                    onChange={(e) => setTempQuantity(parseInt(e.target.value) || 1)}
+                    onChange={(e) => {
+                      const value = parseInt(e.target.value) || 1;
+                      setTempQuantity(value);
+                    }}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-center"
                   />
                 </div>
-                <div className="w-24">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Cost</label>
+                <div className="w-20">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Total</label>
                   <input
                     type="number"
                     min="0"
-                    step="0.01"
-                    value={tempCostPrice}
-                    onChange={(e) => setTempCostPrice(parseFloat(e.target.value) || 0)}
+                    value={tempTotal}
+                    disabled
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-center"
                   />
                 </div>
                 <button
-                  onClick={() => selectedProductId && handleAddProduct(selectedProductId)}
-                  disabled={!selectedProductId}
+                  onClick={() => selectedProductOption && handleAddProduct(selectedProductOption.value)}
+                  disabled={!selectedProductOption}
                   className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed font-medium"
                 >
-                  Add
+                  {editingProductId ? "Update" : "Add"}
                 </button>
               </div>
             </div>
@@ -399,14 +417,31 @@ const NewPurchase = () => {
                               className="w-20 px-2 py-1 text-right border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                             />
                           </td>
-                          <td className="px-4 py-3 text-right font-semibold">PKR {(product.cost_price * product.stock)}</td>
-                          <td className="px-4 py-3 text-center">
+                          <td className="px-4 py-3 text-right font-semibold">PKR {(product.cost_price * product.stock).toFixed(2)}</td>
+                          <td className="px-4 py-3 text-center flex justify-center">
+                            <button
+                              onClick={() => {
+                                setEditingProductId(product.id);
+                                setSelectedProductOption({
+                                  value: product.id,
+                                  label: `${product.name} (SKU: ${product.sku}, Cost: PKR ${product.cost_price})`,
+                                  ...product
+                                });
+                                setTempCostPrice(product.cost_price);
+                                setTempQuantity(product.stock);
+                                setTempTotal(product.cost_price * product.stock);
+                              }}
+                              className="text-blue-600 hover:text-blue-800 p-1 mr-2"
+                              title="Edit item"
+                            >
+                              <Edit size={16} />
+                            </button>
                             <button
                               onClick={() => removeProduct(product.id)}
                               className="text-red-600 hover:text-red-800 p-1"
                               title="Remove item"
                             >
-                              🗑️
+                              <Trash size={16} />
                             </button>
                           </td>
                         </tr>
@@ -423,7 +458,6 @@ const NewPurchase = () => {
             {/* Order Summary Card */}
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
               <h2 className="text-lg font-semibold text-gray-800 mb-4">Purchase Summary</h2>
-              
               {/* Order Discount */}
               <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-700 mb-2">Order Discount</label>
@@ -445,30 +479,28 @@ const NewPurchase = () => {
                   </select>
                 </div>
               </div>
-
               {/* Summary Details */}
               <div className="space-y-3 border-t border-gray-200 pt-4">
                 <div className="flex justify-between text-gray-600">
                   <span>Subtotal:</span>
-                  <span className="font-medium">PKR {subtotal}</span>
+                  <span className="font-medium">PKR {subtotal.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between text-gray-600">
                   <span>Tax:</span>
-                  <span className="font-medium">PKR {tax}</span>
+                  <span className="font-medium">PKR {tax.toFixed(2)}</span>
                 </div>
                 {orderDiscount > 0 && (
                   <div className="flex justify-between text-red-600">
                     <span>Discount:</span>
-                    <span className="font-medium">-PKR {calcOrderDiscount()}</span>
+                    <span className="font-medium">-PKR {calcOrderDiscount().toFixed(2)}</span>
                   </div>
                 )}
                 <div className="flex justify-between text-xl font-bold text-gray-900 border-t border-gray-200 pt-3">
                   <span>Total:</span>
-                  <span className="text-green-600">PKR {grandTotal}</span>
+                  <span className="text-green-600">PKR {grandTotal.toFixed(2)}</span>
                 </div>
               </div>
             </div>
-
             {/* Action Buttons */}
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
               <div className="space-y-3">
@@ -483,12 +515,11 @@ const NewPurchase = () => {
                   onClick={() => {
                     setProducts([]);
                     setOrderDiscount(0);
-                    setSearchTerm("");
                   }}
                   className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-4 rounded-lg font-semibold text-lg transition-colors"
                   disabled={loading}
                 >
-                 Cancel
+                  Cancel
                 </button>
               </div>
             </div>

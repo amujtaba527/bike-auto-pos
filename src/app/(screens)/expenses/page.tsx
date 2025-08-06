@@ -1,8 +1,7 @@
 'use client';
 import { Plus, Search, Pencil, Trash } from 'lucide-react';
-import React , { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Expense } from '@/types/types';
-
 
 const ExpensesPage = () => {
   const [expenses, setExpenses] = useState<Expense[]>([]);
@@ -17,74 +16,129 @@ const ExpensesPage = () => {
   });
   const [loading, setLoading] = useState(false);
 
-  // Inline editing state
-  const [editingExpenseId, setEditingExpenseId] = useState<number | null>(null);
-  const [editExpense, setEditExpense] = useState({
-    description: '',
-    amount: 0,
-    expense_date: new Date().toISOString().split('T')[0],
-    category: '',
-    notes: '',
-  });
-  const [editLoading, setEditLoading] = useState(false);
+  // --- Edit Mode State ---
+  const [isEditMode, setIsEditMode] = useState(false); // New state for mode
+  const [editingExpenseId, setEditingExpenseId] = useState<number | null>(null); // ID of the expense being edited
+  const [editLoading, setEditLoading] = useState(false); // Use one loading state or separate if needed
 
+  // --- Unified handleEditClick ---
   const handleEditClick = (expense: Expense) => {
-    setEditingExpenseId(expense.id);
-    setEditExpense({
+    // Populate the form fields with the selected expense's data
+    setNewExpense({
       description: expense.description,
       amount: expense.amount,
-      expense_date: expense.expense_date,
+      expense_date: expense.expense_date.split('T')[0], // Ensure date format is correct
       category: expense.category,
-      notes: expense.notes,
+      notes: expense.notes || '', // Ensure notes is handled
     });
+    setIsEditMode(true); // Set mode to edit
+    setEditingExpenseId(expense.id); // Store the ID of the expense being edited
+    setShowAddModal(true); // Open the modal
   };
 
-  const handleEditInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setEditExpense({ ...editExpense, [e.target.name]: e.target.value });
-  };
+  // --- Unified handleAddExpense (handles Add & Edit) ---
+  const handleAddExpense = async (e: React.FormEvent) => {
+    e.preventDefault();
+    // Use appropriate loading state
+    if (isEditMode) {
+      setEditLoading(true);
+    } else {
+      setLoading(true);
+    }
 
-  const handleSaveEdit = async (id: number) => {
-    setEditLoading(true);
     try {
-      const res = await fetch(`/api/expense/${id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          description: editExpense.description,
-          amount: editExpense.amount,
-          expense_date: editExpense.expense_date,
-          category: editExpense.category,
-          notes: editExpense.notes,
-        }),
-      });
-      if (!res.ok) throw new Error('Failed to update expense');
-      setEditingExpenseId(null);
-      setEditExpense({ description: '', amount: 0, expense_date: new Date().toISOString().split('T')[0], category: '', notes: '' });
-      // Refresh products
+      let res;
+      if (isEditMode && editingExpenseId !== null) {
+        // --- Edit Logic ---
+        res = await fetch(`/api/expense/${editingExpenseId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            description: newExpense.description,
+            amount: Number(newExpense.amount),
+            expense_date: newExpense.expense_date,
+            category: newExpense.category,
+            notes: newExpense.notes,
+          }),
+        });
+        if (!res.ok) {
+          const errorData = await res.json().catch(() => ({}));
+          throw new Error(errorData.message || 'Failed to update expense');
+        }
+      } else {
+        // --- Add Logic ---
+        res = await fetch('/api/expense', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            description: newExpense.description,
+            amount: Number(newExpense.amount),
+            expense_date: newExpense.expense_date,
+            category: newExpense.category,
+            notes: newExpense.notes,
+          }),
+        });
+        if (!res.ok) {
+          const errorData = await res.json().catch(() => ({}));
+          throw new Error(errorData.message || 'Failed to add expense');
+        }
+      }
+
+      // Close modal and reset states regardless of add/edit
+      handleCancelModal(); // Use the cancel function to reset everything
+
+      // Refresh expenses list
       const refreshed = await fetch('/api/expense').then(r => r.json());
       const expensesArray = Array.isArray(refreshed) ? refreshed : refreshed.expenses || [];
       setExpenses(expensesArray);
+
     } catch (err: unknown) {
-      alert((err as Error).message);
+      console.error("Error in handleAddExpense:", err);
+      alert((err as Error).message || (isEditMode ? 'An error occurred while updating the expense.' : 'An error occurred while adding the expense.'));
     } finally {
-      setEditLoading(false);
+      // Reset appropriate loading state
+      if (isEditMode) {
+        setEditLoading(false);
+      } else {
+        setLoading(false);
+      }
     }
   };
 
-  const handleDiscardEdit = () => {
+  // --- Unified Cancel/Discard Modal ---
+  const handleCancelModal = () => {
+    setShowAddModal(false);
+    setIsEditMode(false);
     setEditingExpenseId(null);
-    setEditExpense({ description: '', amount: 0, expense_date: new Date().toISOString().split('T')[0], category: '', notes: '' });
+    // Reset form data to initial empty state
+    setNewExpense({
+      description: '',
+      amount: 0,
+      expense_date: new Date().toISOString().split('T')[0],
+      category: '',
+      notes: '',
+    });
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const { name, value } = e.target;
+    // Handle number inputs specifically
+    const updatedValue = name === 'amount' ? Number(value) : value;
+    setNewExpense({ ...newExpense, [name]: updatedValue });
   };
 
   const handleDelete = async (id: number) => {
     if (!window.confirm('Are you sure you want to delete this expense?')) return;
-    setEditLoading(true);
+    setEditLoading(true); // Use editLoading for delete too, or add another state
     try {
       const res = await fetch(`/api/expense/${id}`, {
         method: 'DELETE',
       });
-      if (!res.ok) throw new Error('Failed to delete expense');
-      // Refresh products
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.message || 'Failed to delete expense');
+      }
+      // Refresh expenses
       const refreshed = await fetch('/api/expense').then(r => r.json());
       const expensesArray = Array.isArray(refreshed) ? refreshed : refreshed.expenses || [];
       setExpenses(expensesArray);
@@ -92,39 +146,6 @@ const ExpensesPage = () => {
       alert((err as Error).message);
     } finally {
       setEditLoading(false);
-    }
-  };
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setNewExpense({ ...newExpense, [e.target.name]: e.target.value });
-  };
-
-  const handleAddExpense = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    try {
-      const res = await fetch('/api/expense', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          description: newExpense.description,
-          amount: newExpense.amount,
-          expense_date: newExpense.expense_date,
-          category: newExpense.category,
-          notes: newExpense.notes,
-        }),
-      });
-      if (!res.ok) throw new Error('Failed to add expense');
-      setShowAddModal(false);
-      setNewExpense({ description: '', amount: 0, expense_date: new Date().toISOString().split('T')[0], category: '', notes: '' });
-      // Refresh products
-      const refreshed = await fetch('/api/expense').then(r => r.json());
-      const expensesArray = Array.isArray(refreshed) ? refreshed : refreshed.expenses || [];
-      setExpenses(expensesArray);
-    } catch (err: unknown) {
-      alert((err as Error).message);
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -161,19 +182,23 @@ const ExpensesPage = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-100 p-4 md:p-8 w-full max-w-screen-2xl mx-auto text-black">
-      {/* Add Product Modal */}
+      {/* Add/Edit Expense Modal */}
       {showAddModal && (
         <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
           <div className="bg-white rounded-2xl shadow-xl p-8 w-full max-w-md relative">
             <button
               className="absolute top-3 right-3 text-gray-400 hover:text-gray-700 text-xl"
-              onClick={() => setShowAddModal(false)}
+              onClick={handleCancelModal} // Use cancel handler
               aria-label="Close"
             >
               &times;
             </button>
-            <h2 className="text-2xl font-bold mb-6 text-indigo-700">Add New Expense</h2>
+            {/* Conditional Title */}
+            <h2 className="text-2xl font-bold mb-6 text-indigo-700">
+              {isEditMode ? 'Edit Expense' : 'Add New Expense'}
+            </h2>
             <form onSubmit={handleAddExpense} className="space-y-4">
+              <label htmlFor="description">Expense Description</label>
               <input
                 type="text"
                 name="description"
@@ -182,7 +207,10 @@ const ExpensesPage = () => {
                 onChange={handleInputChange}
                 required
                 className="w-full px-4 py-2 border rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-200"
+                disabled={isEditMode && editLoading} // Disable during edit loading
               />
+
+              <label htmlFor="amount">Expense Amount</label>
               <input
                 type="number"
                 name="amount"
@@ -190,8 +218,13 @@ const ExpensesPage = () => {
                 value={newExpense.amount}
                 onChange={handleInputChange}
                 required
+                min="0"
+                step="1"
                 className="w-full px-4 py-2 border rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-200"
+                disabled={isEditMode && editLoading} // Disable during edit loading
               />
+
+              <label htmlFor="expense_date">Expense Date</label>
               <input
                 type="date"
                 name="expense_date"
@@ -200,13 +233,17 @@ const ExpensesPage = () => {
                 onChange={handleInputChange}
                 required
                 className="w-full px-4 py-2 border rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-200"
+                disabled={isEditMode && editLoading} // Disable during edit loading
               />
+
+              <label htmlFor="category">Expense Category</label>
               <select
                 name="category"
                 value={newExpense.category}
-                onChange={(e) => setNewExpense({ ...newExpense, category: e.target.value })}
+                onChange={handleInputChange} // Use the unified handler
                 required
                 className="w-full px-4 py-2 border rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-200"
+                disabled={isEditMode && editLoading} // Disable during edit loading
               >
                 <option value="">Select Category</option>
                 <option value="Rent">Rent</option>
@@ -218,6 +255,8 @@ const ExpensesPage = () => {
                 <option value="Maintenance">Maintenance</option>
                 <option value="Others">Others</option>
               </select>
+
+              <label htmlFor="notes">Expense Notes</label>
               <input
                 type="text"
                 name="notes"
@@ -225,30 +264,36 @@ const ExpensesPage = () => {
                 value={newExpense.notes}
                 onChange={handleInputChange}
                 className="w-full px-4 py-2 border rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-200"
+                disabled={isEditMode && editLoading} // Disable during edit loading
               />
+
+              {/* Conditional Submit Button */}
               <button
                 type="submit"
-                className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-xl font-semibold transition flex items-center justify-center"
-                disabled={loading}
+                className={`w-full ${isEditMode ? 'bg-yellow-500 hover:bg-yellow-600' : 'bg-blue-600 hover:bg-blue-700'} text-white py-2 rounded-xl font-semibold transition flex items-center justify-center`}
+                disabled={loading || editLoading} // Disable based on loading state
               >
-                {loading ? 'Adding...' : 'Add Expense'}
+                {isEditMode
+                  ? (editLoading ? 'Saving...' : 'Save Changes')
+                  : (loading ? 'Adding...' : 'Add Expense')}
               </button>
             </form>
           </div>
         </div>
       )}
-
       <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-8 gap-4">
-        <h1 className="text-3xl font-extrabold text-indigo-700 tracking-tight">Customers</h1>
+        <h1 className="text-3xl font-extrabold text-indigo-700 tracking-tight">Expenses</h1>
         <button
           className="flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-2xl text-base font-semibold shadow-lg transition"
-          onClick={() => setShowAddModal(true)}
+          onClick={() => {
+            handleCancelModal(); // Reset state before opening for Add
+            setShowAddModal(true);
+          }}
         >
           <Plus size={16} />
           <span>Add Expense</span>
         </button>
       </div>
-
       <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6 gap-4">
         <div className="relative w-full md:max-w-md">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
@@ -261,7 +306,6 @@ const ExpensesPage = () => {
           />
         </div>
       </div>
-
       <div className="overflow-x-auto bg-white border border-gray-200 rounded-2xl shadow-lg">
         <table className="min-w-full text-base">
           <thead className="bg-gradient-to-r from-indigo-50 to-blue-50 text-gray-600 font-semibold">
@@ -276,9 +320,9 @@ const ExpensesPage = () => {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
-            {loading ? (
+            {loading && !isEditMode && !editLoading ? ( // Show loading only for initial load/fetch, not edit/add
               <tr>
-                <td colSpan={6} className="px-4 py-8 text-center">
+                <td colSpan={7} className="px-4 py-8 text-center">
                   <div className="flex justify-center">
                     <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
                   </div>
@@ -286,7 +330,7 @@ const ExpensesPage = () => {
               </tr>
             ) : filteredExpenses.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-gray-500">
+                <td colSpan={7} className="px-4 py-8 text-center text-gray-500">
                   No expenses found
                 </td>
               </tr>
@@ -294,95 +338,40 @@ const ExpensesPage = () => {
               filteredExpenses.map((expense) => (
                 <tr key={expense.id} className="hover:bg-gray-50">
                   <td className="px-4 py-3 font-semibold">{expense.id}</td>
-                  {editingExpenseId === expense.id ? (
-                    <>
-                      <td className="px-4 py-3 font-semibold">
-                        <input
-                          type="text"
-                          name="description"
-                          value={editExpense.description}
-                          onChange={handleEditInputChange}
-                          className="w-full px-2 py-1 border rounded"
-                        />
-                      </td>
-                      <td className="px-4 py-3 font-semibold">
-                        <input
-                          type="number"
-                          name="amount"
-                          value={editExpense.amount}
-                          onChange={handleEditInputChange}
-                          className="w-full px-2 py-1 border rounded"
-                        />
-                      </td>
-                      <td className="px-4 py-3 font-semibold">
-                        <input
-                          type="date"
-                          name="expense_date"
-                          value={editExpense.expense_date}
-                          onChange={handleEditInputChange}
-                          className="w-full px-2 py-1 border rounded"
-                        />
-                      </td>
-                      <td className="px-4 py-3 font-semibold">
-                        <input
-                          type="text"
-                          name="category"
-                          value={editExpense.category}
-                          onChange={handleEditInputChange}
-                          className="w-full px-2 py-1 border rounded"
-                        />
-                      </td>
-                      <td className="px-4 py-3 font-semibold">
-                        <input
-                          type="text"
-                          name="notes"
-                          value={editExpense.notes}
-                          onChange={handleEditInputChange}
-                          className="w-full px-2 py-1 border rounded"
-                        />
-                      </td>
-                      <td className="px-4 py-3 flex gap-2">
-                        <button
-                          className="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded"
-                          onClick={() => handleSaveEdit(expense.id)}
-                          disabled={editLoading}
-                        >
-                          Save
-                        </button>
-                        <button
-                          className="bg-gray-400 hover:bg-gray-500 text-white px-3 py-1 rounded"
-                          onClick={handleDiscardEdit}
-                          disabled={editLoading}
-                        >
-                          Discard
-                        </button>
-                      </td>
-                    </>
-                  ) : (
-                    <>
-                      <td className="px-4 py-3 font-semibold">{expense.description}</td>
-                      <td className="px-4 py-3 font-semibold">{expense.amount}</td>
-                      <td className="px-4 py-3 font-semibold">{expense.expense_date.split('T')[0] }</td>
-                      <td className="px-4 py-3 font-semibold">{expense.category}</td>
-                      <td className="px-4 py-3 font-semibold">{expense.notes ? expense.notes : "N/A"}</td>
-                      <td className="px-4 py-3 flex gap-2">
-                        <button
-                          className="bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-1 rounded"
-                          onClick={() => handleEditClick(expense)}
-                          disabled={!!editingExpenseId}
-                        >
-                          <Pencil size={16} />
-                        </button>
-                        <button
-                          className="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded"
-                          onClick={() => handleDelete(expense.id)}
-                          disabled={editLoading || !!editingExpenseId}
-                        >
-                          <Trash size={16} />
-                        </button>
-                      </td>
-                    </>
-                  )}
+                  <td className="px-4 py-3 font-semibold">{expense.description}</td>
+                  <td className="px-4 py-3 font-semibold">{expense.amount.toLocaleString()}</td>
+                  <td className="px-4 py-3 font-semibold">{expense.expense_date.split('T')[0]}</td>
+                  <td className="px-4 py-3 font-semibold">{expense.category}</td>
+                  <td className="px-4 py-3 font-semibold">{expense.notes ? expense.notes : "N/A"}</td>
+                  <td className="px-4 py-3 flex gap-2">
+                    {/* Edit Button */}
+                    <button
+                      className={`p-2 rounded ${
+                        isEditMode || editLoading || loading // Disable if any operation is active
+                          ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                          : 'bg-yellow-500 hover:bg-yellow-600 text-white'
+                      }`}
+                      onClick={() => handleEditClick(expense)}
+                      disabled={isEditMode || editLoading || loading} // Disable based on state
+                      aria-label="Edit"
+                    >
+                      <Pencil size={16} />
+                    </button>
+
+                    {/* Delete Button */}
+                    <button
+                      className={`p-2 rounded ${
+                        isEditMode || editLoading || loading // Disable if any operation is active
+                          ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                          : 'bg-red-600 hover:bg-red-700 text-white'
+                      }`}
+                      onClick={() => handleDelete(expense.id)}
+                      disabled={isEditMode || editLoading || loading} // Disable based on state
+                      aria-label="Delete"
+                    >
+                      <Trash size={16} />
+                    </button>
+                  </td>
                 </tr>
               ))
             )}
