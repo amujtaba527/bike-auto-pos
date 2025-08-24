@@ -9,6 +9,25 @@ interface PurchaseItem {
   line_total: number;
 }
 
+// GET /api/purchases/[id] - Get specific purchase
+export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  try {
+    const { id } = await params;
+    
+    // Fetch the specific purchase by ID
+    const res = await pool.query("SELECT * FROM purchases WHERE id = $1", [id]);
+    
+    if (res.rows.length === 0) {
+      return NextResponse.json({ error: "Purchase not found" }, { status: 404 });
+    }   
+    
+    const purchaseItemsRes = await pool.query("SELECT * FROM purchase_items WHERE purchase_id = $1", [id]);
+    return NextResponse.json({ purchase: res.rows[0], items: purchaseItemsRes.rows });
+  } catch (error) {
+    return NextResponse.json({ error: "Error fetching purchase: " + error }, { status: 500 });
+  }
+}
+
 export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const client = await pool.connect();
   
