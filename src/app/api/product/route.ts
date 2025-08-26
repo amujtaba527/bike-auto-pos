@@ -18,6 +18,23 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Invalid product details" }, { status: 400 });
     }
 
+    const productname = body.name.trim().replace(/\s/g, "").toLowerCase();
+
+    // Check if product already exists
+    const existingProduct = await pool.query(
+      "SELECT * FROM products WHERE brand_id = $1 and category_id = $2",
+      [body.brand_id, body.category_id]
+    );
+    
+    const existingProductRow = existingProduct.rows.find(
+      (p: any) => p.name.trim().replace(/\s/g, "").toLowerCase() === productname
+    );
+    
+    if (existingProductRow) {
+      return NextResponse.json({ error: "Product already exists" }, { status: 400 });
+    }
+    
+
     let sku = body.sku && body.sku.trim() !== "" ? body.sku.trim() : null;
     if (!sku) {
       const lastSKURes = await pool.query(`
@@ -42,7 +59,7 @@ export async function POST(req: Request) {
       sale_price = 0;
     }
 
-    const res = await pool.query("INSERT INTO products (name, sku, description, cost_price, sale_price, brand_id, category_id, min_stock_level) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *", [body.name, sku, body.description, body.cost_price, body.sale_price, body.brand_id, body.category_id, body.min_stock_level]);
+    const res = await pool.query("INSERT INTO products (name, sku, description, cost_price, sale_price, brand_id, category_id, min_stock_level) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *", [body.name.trim(), sku, body.description, body.cost_price, body.sale_price, body.brand_id, body.category_id, body.min_stock_level]);
 
     return NextResponse.json({ message: "Product added successfully", product: res.rows[0] });
   } catch (error) {

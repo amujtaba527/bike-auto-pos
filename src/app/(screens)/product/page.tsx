@@ -78,7 +78,7 @@ const Products = () => {
         });  
         if (!res.ok) {
           const errorData = await res.json().catch(() => ({}));
-          throw new Error(errorData.message || 'Failed to update product');
+          throw new Error(errorData.error || 'Failed to update product');
         }
       } else {
         // --- Add Logic ---
@@ -98,7 +98,7 @@ const Products = () => {
         });
         if (!res.ok) {
           const errorData = await res.json().catch(() => ({}));
-          throw new Error(errorData.message || 'Failed to add product');
+          throw new Error(errorData.error || 'Failed to add product');
         }
       }
 
@@ -110,9 +110,8 @@ const Products = () => {
       const productsArray = Array.isArray(refreshed) ? refreshed : refreshed.products || [];
       setProducts(productsArray);
 
-    } catch (err: unknown) {
-      console.error("Error in handleAddProduct:", err);
-      alert((err as Error).message || (isEditMode ? 'An error occurred while updating the product.' : 'An error occurred while adding the product.'));
+    } catch (err:unknown) {
+      alert((err as Error).message);
     } finally {
       // Reset appropriate loading state
       if (isEditMode) {
@@ -154,7 +153,7 @@ const Products = () => {
       });
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({}));
-        throw new Error(errorData.message || 'Failed to delete product');
+        throw new Error(errorData.error || 'Failed to delete product');
       }
       // Refresh products
       const refreshed = await fetch('/api/product').then(r => r.json());

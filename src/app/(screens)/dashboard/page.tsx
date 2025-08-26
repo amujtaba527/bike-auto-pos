@@ -1,385 +1,245 @@
-'use client';
-import { Plus, Search, Pencil, Trash } from 'lucide-react';
-import React, { useEffect, useState } from 'react';
-import { Expense } from '@/types/types';
+"use client";
 
-const ExpensesPage = () => {
+import { useState, useEffect } from 'react';
+import { 
+  ShoppingCart, 
+  ShoppingBag, 
+  Users,
+  DollarSign
+} from 'lucide-react';
+import {SaleRecord, Purchase, Expense, Customer, Vendor} from '@/types/types';
+
+interface OverviewCardProps {
+  title: string;
+  value: number | string;
+}
+
+interface SaleWithCustomer extends SaleRecord {
+  customer_name: string;
+}
+
+interface PurchaseWithVendor extends Purchase {
+  vendor_name: string;
+}
+
+export default function Dashboard() {
+  const [currentDate, setCurrentDate] = useState('');
+  const [sales, setSales] = useState<SaleWithCustomer[]>([]);
+  const [purchases, setPurchases] = useState<PurchaseWithVendor[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [newExpense, setNewExpense] = useState({
-    description: '',
-    amount: 0,
-    expense_date: new Date().toISOString().split('T')[0],
-    category: '',
-    notes: '',
-  });
-  const [loading, setLoading] = useState(false);
-
-  // --- Edit Mode State ---
-  const [isEditMode, setIsEditMode] = useState(false); // New state for mode
-  const [editingExpenseId, setEditingExpenseId] = useState<number | null>(null); // ID of the expense being edited
-  const [editLoading, setEditLoading] = useState(false); // Use one loading state or separate if needed
-
-  // --- Unified handleEditClick ---
-  const handleEditClick = (expense: Expense) => {
-    // Populate the form fields with the selected expense's data
-    setNewExpense({
-      description: expense.description,
-      amount: expense.amount,
-      expense_date: expense.expense_date.split('T')[0], // Ensure date format is correct
-      category: expense.category,
-      notes: expense.notes || '', // Ensure notes is handled
-    });
-    setIsEditMode(true); // Set mode to edit
-    setEditingExpenseId(expense.id); // Store the ID of the expense being edited
-    setShowAddModal(true); // Open the modal
-  };
-
-  // --- Unified handleAddExpense (handles Add & Edit) ---
-  const handleAddExpense = async (e: React.FormEvent) => {
-    e.preventDefault();
-    // Use appropriate loading state
-    if (isEditMode) {
-      setEditLoading(true);
-    } else {
-      setLoading(true);
-    }
-
-    try {
-      let res;
-      if (isEditMode && editingExpenseId !== null) {
-        // --- Edit Logic ---
-        res = await fetch(`/api/expense/${editingExpenseId}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            description: newExpense.description,
-            amount: Number(newExpense.amount),
-            expense_date: newExpense.expense_date,
-            category: newExpense.category,
-            notes: newExpense.notes,
-          }),
-        });
-        if (!res.ok) {
-          const errorData = await res.json().catch(() => ({}));
-          throw new Error(errorData.message || 'Failed to update expense');
-        }
-      } else {
-        // --- Add Logic ---
-        res = await fetch('/api/expense', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            description: newExpense.description,
-            amount: Number(newExpense.amount),
-            expense_date: newExpense.expense_date,
-            category: newExpense.category,
-            notes: newExpense.notes,
-          }),
-        });
-        if (!res.ok) {
-          const errorData = await res.json().catch(() => ({}));
-          throw new Error(errorData.message || 'Failed to add expense');
-        }
-      }
-
-      // Close modal and reset states regardless of add/edit
-      handleCancelModal(); // Use the cancel function to reset everything
-
-      // Refresh expenses list
-      const refreshed = await fetch('/api/expense').then(r => r.json());
-      const expensesArray = Array.isArray(refreshed) ? refreshed : refreshed.expenses || [];
-      setExpenses(expensesArray);
-
-    } catch (err: unknown) {
-      console.error("Error in handleAddExpense:", err);
-      alert((err as Error).message || (isEditMode ? 'An error occurred while updating the expense.' : 'An error occurred while adding the expense.'));
-    } finally {
-      // Reset appropriate loading state
-      if (isEditMode) {
-        setEditLoading(false);
-      } else {
-        setLoading(false);
-      }
-    }
-  };
-
-  // --- Unified Cancel/Discard Modal ---
-  const handleCancelModal = () => {
-    setShowAddModal(false);
-    setIsEditMode(false);
-    setEditingExpenseId(null);
-    // Reset form data to initial empty state
-    setNewExpense({
-      description: '',
-      amount: 0,
-      expense_date: new Date().toISOString().split('T')[0],
-      category: '',
-      notes: '',
-    });
-  };
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    const { name, value } = e.target;
-    // Handle number inputs specifically
-    const updatedValue = name === 'amount' ? Number(value) : value;
-    setNewExpense({ ...newExpense, [name]: updatedValue });
-  };
-
-  const handleDelete = async (id: number) => {
-    if (!window.confirm('Are you sure you want to delete this expense?')) return;
-    setEditLoading(true); // Use editLoading for delete too, or add another state
-    try {
-      const res = await fetch(`/api/expense/${id}`, {
-        method: 'DELETE',
-      });
-      if (!res.ok) {
-        const errorData = await res.json().catch(() => ({}));
-        throw new Error(errorData.message || 'Failed to delete expense');
-      }
-      // Refresh expenses
-      const refreshed = await fetch('/api/expense').then(r => r.json());
-      const expensesArray = Array.isArray(refreshed) ? refreshed : refreshed.expenses || [];
-      setExpenses(expensesArray);
-    } catch (err: unknown) {
-      alert((err as Error).message);
-    } finally {
-      setEditLoading(false);
-    }
-  };
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [vendors, setVendors] = useState<Vendor[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const fetchExpenses = async () => {
-      setLoading(true);
+    const date = new Date();
+    const formattedDate = date.toLocaleDateString('en-US', {
+      month: 'numeric',
+      day: 'numeric',
+      year: 'numeric',
+    });
+    setCurrentDate(formattedDate);
+    
+    const fetchData = async () => {
       try {
-        const res = await fetch('/api/expense');
-        const data = await res.json();
-        const expensesArray = Array.isArray(data) ? data : data.expenses || [];
-        const formatted = expensesArray.map((expense: Expense) => ({
-          id: expense.id,
-          description: expense.description,
-          amount: expense.amount,
-          expense_date: expense.expense_date,
-          category: expense.category,
-          notes: expense.notes
-        }));
-        setExpenses(formatted);
+        setLoading(true);
+        const [salesRes, purchasesRes, customersRes, vendorsRes, expensesRes] = await Promise.all([
+          fetch('/api/sale'),
+          fetch('/api/purchase'),
+          fetch('/api/customer'),
+          fetch('/api/vendor'),
+          fetch('/api/expense')
+        ]);
+
+        const [salesData, purchasesData, customersData, vendorsData, expensesData] = await Promise.all([
+          salesRes.json(),
+          purchasesRes.json(),
+          customersRes.json(),
+          vendorsRes.json(),
+          expensesRes.json()
+        ]);
+
+        // Set customers and vendors first
+        const customersArray = Array.isArray(customersData) ? customersData : [];
+        const vendorsArray = Array.isArray(vendorsData) ? vendorsData : [];
+        
+        setCustomers(customersArray);
+        setVendors(vendorsArray);
+        setExpenses(Array.isArray(expensesData) ? expensesData : []);
+        
+        // Now map sales with customer names using the local arrays
+        setSales(Array.isArray(salesData) ? salesData.map((sale: SaleRecord) => {
+          const customer = customersArray.find((c: Customer) => c.id === sale.customer_id);
+          return {
+            ...sale,
+            customer_name: customer ? customer.name : 'Unknown Customer'
+          };
+        }) : []);
+        
+        // Map purchases with vendor names using the local arrays
+        setPurchases(Array.isArray(purchasesData) ? purchasesData.map(purchase => {
+          const vendor = vendorsArray.find((v: Vendor) => v.id === purchase.vendor_id);
+          return {
+            ...purchase,
+            vendor_name: vendor ? vendor.name : 'Unknown Vendor'
+          };
+        }) : []);
       } catch (err: unknown) {
-        alert("Error fetching expenses: " + (err as Error).message);
+        setError('Failed to fetch dashboard data');
+        console.error(err);
       } finally {
         setLoading(false);
       }
     };
-    fetchExpenses();
+
+    fetchData();
   }, []);
 
-  // Filter expenses based on search query
-  const filteredExpenses = expenses.filter(expense =>
-    expense.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    expense.category.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const formatCurrency = (amount: number): string => {
+    return new Intl.NumberFormat('en-PK', {
+      style: 'currency',
+      currency: 'PKR',
+    }).format(amount);
+  };
+
+  // Calculate totals
+  const totalSales = sales.reduce((sum, sale) => sum + Number(sale.total_amount), 0);
+  const totalPurchases = purchases.reduce((sum, purchase) => sum + Number(purchase.total_amount), 0);
+  const totalExpenses = expenses.reduce((sum, expense) => sum + Number(expense.amount), 0);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-100 p-4 md:p-8 w-full max-w-screen-2xl mx-auto flex items-center justify-center">
+        <div className="text-center">
+          <div className="inline-block animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-600 mb-4"></div>
+          <p className="text-gray-600">Loading dashboard data...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-100 p-4 md:p-8 w-full max-w-screen-2xl mx-auto flex items-center justify-center">
+        <div className="bg-white rounded-2xl shadow-lg p-8 max-w-md w-full text-center">
+          <div className="text-red-500 mb-4">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+          </div>
+          <h2 className="text-2xl font-bold text-gray-800 mb-2">Error Loading Data</h2>
+          <p className="text-gray-600 mb-6">{error}</p>
+          <button 
+            onClick={() => window.location.reload()}
+            className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-6 rounded-2xl transition duration-200"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-100 p-4 md:p-8 w-full max-w-screen-2xl mx-auto text-black">
-      {/* Add/Edit Expense Modal */}
-      {showAddModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl shadow-xl p-8 w-full max-w-md relative">
-            <button
-              className="absolute top-3 right-3 text-gray-400 hover:text-gray-700 text-xl"
-              onClick={handleCancelModal} // Use cancel handler
-              aria-label="Close"
-            >
-              &times;
-            </button>
-            {/* Conditional Title */}
-            <h2 className="text-2xl font-bold mb-6 text-indigo-700">
-              {isEditMode ? 'Edit Expense' : 'Add New Expense'}
-            </h2>
-            <form onSubmit={handleAddExpense} className="space-y-4">
-              <label htmlFor="description">Expense Description</label>
-              <input
-                type="text"
-                name="description"
-                placeholder="Expense Description"
-                value={newExpense.description}
-                onChange={handleInputChange}
-                required
-                className="w-full px-4 py-2 border rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-200"
-                disabled={isEditMode && editLoading} // Disable during edit loading
-              />
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-100 p-4 md:p-8 w-full max-w-screen-2xl mx-auto">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8">
+        <h1 className="text-3xl font-extrabold text-gray-800 tracking-tight mb-2 md:mb-0">Dashboard</h1>
+        <p className="text-sm text-gray-500">Last updated: {currentDate}</p>
+      </div>
 
-              <label htmlFor="amount">Expense Amount</label>
-              <input
-                type="number"
-                name="amount"
-                placeholder="Expense Amount"
-                value={newExpense.amount}
-                onChange={handleInputChange}
-                required
-                min="0"
-                step="1"
-                className="w-full px-4 py-2 border rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-200"
-                disabled={isEditMode && editLoading} // Disable during edit loading
-              />
+      {/* Overview Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
+        <OverviewCard 
+          title="Total Sales" 
+          value={formatCurrency(totalSales)} 
+        />
+        <OverviewCard 
+          title="Total Purchases" 
+          value={formatCurrency(totalPurchases)} 
+        />
+        <OverviewCard 
+          title="Total Expenses" 
+          value={formatCurrency(totalExpenses)} 
+        />
+      </div>
 
-              <label htmlFor="expense_date">Expense Date</label>
-              <input
-                type="date"
-                name="expense_date"
-                placeholder="Expense Date"
-                value={newExpense.expense_date}
-                onChange={handleInputChange}
-                required
-                className="w-full px-4 py-2 border rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-200"
-                disabled={isEditMode && editLoading} // Disable during edit loading
-              />
-
-              <label htmlFor="category">Expense Category</label>
-              <select
-                name="category"
-                value={newExpense.category}
-                onChange={handleInputChange} // Use the unified handler
-                required
-                className="w-full px-4 py-2 border rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-200"
-                disabled={isEditMode && editLoading} // Disable during edit loading
-              >
-                <option value="">Select Category</option>
-                <option value="Rent">Rent</option>
-                <option value="Utilities">Utilities</option>
-                <option value="Electricity">Electricity</option>
-                <option value="Internet">Internet</option>
-                <option value="Salaries">Salaries</option>
-                <option value="Wages">Wages</option>
-                <option value="Maintenance">Maintenance</option>
-                <option value="Others">Others</option>
-              </select>
-
-              <label htmlFor="notes">Expense Notes</label>
-              <input
-                type="text"
-                name="notes"
-                placeholder="Expense Notes"
-                value={newExpense.notes}
-                onChange={handleInputChange}
-                className="w-full px-4 py-2 border rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-200"
-                disabled={isEditMode && editLoading} // Disable during edit loading
-              />
-
-              {/* Conditional Submit Button */}
-              <button
-                type="submit"
-                className={`w-full ${isEditMode ? 'bg-yellow-500 hover:bg-yellow-600' : 'bg-blue-600 hover:bg-blue-700'} text-white py-2 rounded-xl font-semibold transition flex items-center justify-center`}
-                disabled={loading || editLoading} // Disable based on loading state
-              >
-                {isEditMode
-                  ? (editLoading ? 'Saving...' : 'Save Changes')
-                  : (loading ? 'Adding...' : 'Add Expense')}
-              </button>
-            </form>
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
+        {/* Recent Sales */}
+        <div className="bg-white/90 backdrop-blur-lg border border-gray-200 rounded-3xl shadow-2xl p-6">
+          <h2 className="text-xl font-bold text-gray-800 mb-4">Recent Sales</h2>
+          <div className="overflow-x-auto rounded-2xl">
+            <table className="w-full min-w-full text-sm">
+              <thead className="bg-gradient-to-r from-indigo-50 to-blue-50">
+                <tr>
+                  <th className="px-4 py-3 text-left font-semibold text-gray-500 uppercase tracking-wider">ID</th>
+                  <th className="px-4 py-3 text-left font-semibold text-gray-500 uppercase tracking-wider">Date</th>
+                  <th className="px-4 py-3 text-left font-semibold text-gray-500 uppercase tracking-wider">Client</th>
+                  <th className="px-4 py-3 text-left font-semibold text-gray-500 uppercase tracking-wider">Payment</th>
+                  <th className="px-4 py-3 text-right font-semibold text-gray-500 uppercase tracking-wider">Amount</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {sales.slice(0, 4).map((sale) => (
+                  <tr key={sale.id} className="hover:bg-indigo-50 transition-all">
+                    <td className="px-4 py-3 text-gray-500">#{sale.id}</td>
+                    <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{new Date(sale.sale_date).toLocaleDateString()}</td>
+                    <td className="px-4 py-3 font-medium text-gray-700">{sale.customer_name}</td>
+                    <td className="px-4 py-3">
+                      <span className={`inline-flex items-center px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800`}>
+                        <DollarSign className="mr-1 h-3 w-3" />
+                        CASH
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 font-semibold text-right text-indigo-600">{formatCurrency(sale.total_amount)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
-      )}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-8 gap-4">
-        <h1 className="text-3xl font-extrabold text-indigo-700 tracking-tight">Expenses</h1>
-        <button
-          className="flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-2xl text-base font-semibold shadow-lg transition"
-          onClick={() => {
-            handleCancelModal(); // Reset state before opening for Add
-            setShowAddModal(true);
-          }}
-        >
-          <Plus size={16} />
-          <span>Add Expense</span>
-        </button>
-      </div>
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6 gap-4">
-        <div className="relative w-full md:max-w-md">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
-          <input
-            type="text"
-            placeholder="Search expenses..."
-            className="w-full pl-12 pr-4 py-3 border border-gray-200 rounded-xl bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-200 text-base"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
-        </div>
-      </div>
-      <div className="overflow-x-auto bg-white border border-gray-200 rounded-2xl shadow-lg">
-        <table className="min-w-full text-base">
-          <thead className="bg-gradient-to-r from-indigo-50 to-blue-50 text-gray-600 font-semibold">
-            <tr>
-              <th className="px-4 py-3 text-left">ID</th>
-              <th className="px-4 py-3 text-left">Description</th>
-              <th className="px-4 py-3 text-left">Amount</th>
-              <th className="px-4 py-3 text-left">Expense Date</th>
-              <th className="px-4 py-3 text-left">Category</th>
-              <th className="px-4 py-3 text-left">Notes</th>
-              <th className="px-4 py-3 text-left">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-100">
-            {loading && !isEditMode && !editLoading ? ( // Show loading only for initial load/fetch, not edit/add
-              <tr>
-                <td colSpan={7} className="px-4 py-8 text-center">
-                  <div className="flex justify-center">
-                    <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
-                  </div>
-                </td>
-              </tr>
-            ) : filteredExpenses.length === 0 ? (
-              <tr>
-                <td colSpan={7} className="px-4 py-8 text-center text-gray-500">
-                  No expenses found
-                </td>
-              </tr>
-            ) : (
-              filteredExpenses.map((expense) => (
-                <tr key={expense.id} className="hover:bg-gray-50">
-                  <td className="px-4 py-3 font-semibold">{expense.id}</td>
-                  <td className="px-4 py-3 font-semibold">{expense.description}</td>
-                  <td className="px-4 py-3 font-semibold">{expense.amount.toLocaleString()}</td>
-                  <td className="px-4 py-3 font-semibold">{expense.expense_date.split('T')[0]}</td>
-                  <td className="px-4 py-3 font-semibold">{expense.category}</td>
-                  <td className="px-4 py-3 font-semibold">{expense.notes ? expense.notes : "N/A"}</td>
-                  <td className="px-4 py-3 flex gap-2">
-                    {/* Edit Button */}
-                    <button
-                      className={`p-2 rounded ${
-                        isEditMode || editLoading || loading // Disable if any operation is active
-                          ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                          : 'bg-yellow-500 hover:bg-yellow-600 text-white'
-                      }`}
-                      onClick={() => handleEditClick(expense)}
-                      disabled={isEditMode || editLoading || loading} // Disable based on state
-                      aria-label="Edit"
-                    >
-                      <Pencil size={16} />
-                    </button>
-
-                    {/* Delete Button */}
-                    <button
-                      className={`p-2 rounded ${
-                        isEditMode || editLoading || loading // Disable if any operation is active
-                          ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                          : 'bg-red-600 hover:bg-red-700 text-white'
-                      }`}
-                      onClick={() => handleDelete(expense.id)}
-                      disabled={isEditMode || editLoading || loading} // Disable based on state
-                      aria-label="Delete"
-                    >
-                      <Trash size={16} />
-                    </button>
-                  </td>
+        {/* Recent Purchases */}
+        <div className="bg-white/90 backdrop-blur-lg border border-gray-200 rounded-3xl shadow-2xl p-6">
+          <h2 className="text-xl font-bold text-gray-800 mb-4">Recent Purchases</h2>
+          <div className="overflow-x-auto rounded-2xl">
+            <table className="w-full min-w-full text-sm">
+              <thead className="bg-gradient-to-r from-indigo-50 to-blue-50">
+                <tr>
+                  <th className="px-4 py-3 text-left font-semibold text-gray-500 uppercase tracking-wider">ID</th>
+                  <th className="px-4 py-3 text-left font-semibold text-gray-500 uppercase tracking-wider">Date</th>
+                  <th className="px-4 py-3 text-left font-semibold text-gray-500 uppercase tracking-wider">Vendor</th>
+                  <th className="px-4 py-3 text-right font-semibold text-gray-500 uppercase tracking-wider">Amount</th>
                 </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {purchases.slice(0, 4).map((purchase) => (
+                  <tr key={purchase.id} className="hover:bg-indigo-50 transition-all">
+                    <td className="px-4 py-3 text-gray-500">#{purchase.id}</td>
+                    <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{new Date(purchase.purchase_date).toLocaleDateString()}</td>
+                    <td className="px-4 py-3 font-medium text-gray-700">{purchase.vendor_name}</td>
+                    <td className="px-4 py-3 font-semibold text-right text-indigo-600">{formatCurrency(purchase.total_amount)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
       </div>
     </div>
   );
-};
+}
 
-export default ExpensesPage;
+// Overview Card Component
+function OverviewCard({ title, value }: OverviewCardProps) {
+  return (
+    <div className="bg-white/90 backdrop-blur-lg border border-gray-200 rounded-2xl shadow-2xl p-6 flex flex-col gap-2 overflow-auto">
+      <div className="flex justify-between items-center mb-1">
+        <div>
+          <p className="text-sm font-semibold text-gray-500 mb-1">{title}</p>
+          <p className="text-3xl font-extrabold text-gray-800">{value}</p>
+        </div>
+        
+      </div>
+    </div>
+  );
+}
