@@ -3,7 +3,7 @@ import { MinusIcon, PlusIcon, Edit, Trash, User } from "lucide-react";
 import React, { useState, useEffect } from "react";
 import { v4 as uuidv4 } from "uuid";
 import dynamic from "next/dynamic";
-import { Product, Vendor } from '@/types/types';
+import { Product, Vendor ,Brand} from '@/types/types';
 
 // Dynamically import react-select to avoid SSR issues
 const Select = dynamic(() => import('react-select'), { ssr: false });
@@ -18,6 +18,7 @@ const NewPurchase = () => {
   const [vendor, setVendor] = useState<Vendor | null>(null);
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [allProducts, setAllProducts] = useState<Product[]>([]);
+  const [allbrands, setAllbrands] = useState<Brand[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [orderDiscount, setOrderDiscount] = useState<number>(0);
   const [orderDiscountType, setOrderDiscountType] = useState<"%" | "PKR">("PKR");
@@ -43,14 +44,17 @@ const NewPurchase = () => {
   useEffect(() => {
     Promise.all([
       fetch('/api/vendor').then(res => res.json()),
-      fetch('/api/product').then(res => res.json())
+      fetch('/api/product').then(res => res.json()),
+      fetch('/api/brand').then(res => res.json())
     ])
-    .then(([vendorData, productData]) => {
+    .then(([vendorData, productData, brandData]) => {
       const vendorList = Array.isArray(vendorData) ? vendorData : vendorData.vendors || [];
       const productList = Array.isArray(productData) ? productData : productData.products || [];
+      const brandList = Array.isArray(brandData) ? brandData : brandData.brands || [];
       
       setVendors(vendorList);
       setAllProducts(productList);
+      setAllbrands(brandList);
 
       // Set default vendor to "Walk In" (ID: 1)
       const walkInVendor = vendorList.find((v: Vendor) => v.id === 1);
@@ -292,7 +296,7 @@ const NewPurchase = () => {
                   <Select
                     options={allProducts.map(product => ({
                       value: product.id,
-                      label: `${product.name} (SKU: ${product.sku}, Cost: PKR ${product.cost_price})`,
+                      label: `${product.name} (Brand: ${allbrands.find(b => b.id === product.brand_id)?.name}, SKU: ${product.sku}, Cost: PKR ${product.cost_price})`,
                       ...product
                     }))}
                     value={selectedProductOption}
@@ -382,6 +386,7 @@ const NewPurchase = () => {
                         <tr key={product.id} className="hover:bg-gray-50">
                           <td className="px-4 py-3">
                             <div className="font-medium text-gray-900">{product.name}</div>
+                            <div className="text-sm text-gray-500">Brand: {allbrands.find(b => b.id === product.brand_id)?.name}</div>
                             <div className="text-sm text-gray-500">SKU: {product.sku}</div>
                           </td>
                           <td className="px-4 py-3 text-center">
@@ -424,7 +429,7 @@ const NewPurchase = () => {
                                 setEditingProductId(product.id);
                                 setSelectedProductOption({
                                   value: product.id,
-                                  label: `${product.name} (SKU: ${product.sku}, Cost: PKR ${product.cost_price})`,
+                                  label: `${product.name} (Brand: ${allbrands.find(b => b.id === product.brand_id)?.name}, SKU: ${product.sku}, Cost: PKR ${product.cost_price})`,
                                   ...product
                                 });
                                 setTempCostPrice(product.cost_price);
