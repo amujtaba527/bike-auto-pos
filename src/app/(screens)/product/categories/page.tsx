@@ -259,7 +259,7 @@ const CategoriesBrands = () => {
     );
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-100 p-4 md:p-8 w-full max-w-screen-2xl mx-auto text-black">
+        <div className="max-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-100 p-4 md:p-8 w-full max-w-screen-2xl mx-auto text-black">
             <div className="max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-8">
                 {/* Brands Card */}
                 <div className="bg-white rounded-lg shadow p-6 flex flex-col">
@@ -286,10 +286,10 @@ const CategoriesBrands = () => {
                             onChange={(e) => setBrandSearch(e.target.value)}
                         />
                     </div>
-                    <div className="overflow-x-auto rounded">
+                    <div className="overflow-x-auto bg-white border border-gray-200 rounded-2xl shadow-lg max-h-[calc(100vh-360px)] overflow-y-scroll">
                         <table className="min-w-full text-sm">
                             <thead>
-                                <tr className="bg-gray-50">
+                                <tr className="bg-gradient-to-r from-indigo-50 to-blue-50 text-gray-600 font-semibold sticky top-0 z-10">
                                     <th className="px-4 py-2 text-left">ID</th>
                                     <th className="px-4 py-2 text-left">Brand Name</th>
                                     <th className="px-4 py-2 text-left">Actions</th>
@@ -360,10 +360,10 @@ const CategoriesBrands = () => {
                             onChange={(e) => setCategorySearch(e.target.value)}
                         />
                     </div>
-                    <div className="overflow-x-auto rounded">
+                    <div className="overflow-x-auto rounded overflow-y-scroll max-h-[calc(100vh-360px)]">
                         <table className="min-w-full text-sm">
                             <thead>
-                                <tr className="bg-gray-50">
+                                <tr className="bg-gradient-to-r from-indigo-50 to-blue-50 text-gray-600 font-semibold sticky top-0 z-10">
                                     <th className="px-4 py-2 text-left">ID</th>
                                     <th className="px-4 py-2 text-left">Category Name</th>
                                     <th className="px-4 py-2 text-left">Actions</th>

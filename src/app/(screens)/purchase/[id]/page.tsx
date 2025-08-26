@@ -119,7 +119,7 @@ export default function PurchaseDetailPage({ params }: { params: Promise<{ id: s
             <thead>
               <tr className="bg-gray-100">
                 <th className="py-2 px-4 border-b text-left">Product</th>
-                <th className="py-2 px-4 border-b text-right">Price</th>
+                <th className="py-2 px-4 border-b text-right">Rate</th>
                 <th className="py-2 px-4 border-b text-right">Quantity</th>
                 <th className="py-2 px-4 border-b text-right">Total</th>
               </tr>
@@ -133,9 +133,9 @@ export default function PurchaseDetailPage({ params }: { params: Promise<{ id: s
                 return (
                   <tr key={key} className="border-b">
                     <td className="py-2 px-4">{product?.name || 'Unknown Product'}</td>
-                    <td className="py-2 px-4 text-right">PKR {product?.cost_price || '0.00'}</td>
+                    <td className="py-2 px-4 text-right">{Number(product?.cost_price || '0.00').toFixed(2)}</td>
                     <td className="py-2 px-4 text-right">{item.quantity}</td>
-                    <td className="py-2 px-4 text-right font-medium">PKR {itemTotal}</td>
+                    <td className="py-2 px-4 text-right font-medium">{Number(itemTotal).toFixed(2)}</td>
                   </tr>
                 );
               })}
@@ -148,15 +148,17 @@ export default function PurchaseDetailPage({ params }: { params: Promise<{ id: s
       <div className="mb-8 ml-auto max-w-xs">
         <div className="flex justify-between py-2">
           <span className="text-gray-600">Subtotal:</span>
-          <span className="font-medium">PKR {subtotal}</span>
+          <span className="font-medium">{Number(subtotal).toFixed(2)}</span>
         </div>
+        {totalDiscount > 0 && (
         <div className="flex justify-between py-2">
           <span className="text-gray-600">Discount:</span>
-          <span className="font-medium">PKR {totalDiscount}</span>
+          <span className="font-medium">{Number(totalDiscount).toFixed(2)}</span>
         </div>
+        )}
         <div className="flex justify-between py-2 border-t border-gray-300 mt-2 pt-2">
           <span className="text-lg font-semibold">Total:</span>
-          <span className="text-lg font-bold">PKR {totalAmount}</span>
+          <span className="text-lg font-bold">{Number(totalAmount).toFixed(2)}</span>
         </div>
       </div>
 

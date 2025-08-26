@@ -61,8 +61,8 @@ export async function POST(req: Request) {
     const amountPaid = body.total_amount;
     // Insert purchase record
     const res = await client.query(
-      "INSERT INTO purchases (invoice_number, vendor_id, subtotal, tax_amount, total_amount,amount_paid,purchase_date) VALUES ($1, $2, $3, $4, $5,$6,$7) RETURNING *", 
-      [body.invoice_number, body.vendor_id, body.subtotal, body.tax_amount, body.total_amount,amountPaid,purchase_date]
+      "INSERT INTO purchases (invoice_number, vendor_id, subtotal, tax_amount, total_amount,amount_paid, purchase_date) VALUES ($1, $2, $3, $4, $5,$6,$7) RETURNING *", 
+      [body.invoice_number, body.vendor_id, body.subtotal, body.tax_amount, body.total_amount,amountPaid, purchase_date]
     );
     
     const purchase = res.rows[0];

@@ -40,9 +40,9 @@ const ProductsDemand = () => {
   );
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-100 p-4 md:p-8 w-full max-w-screen-2xl mx-auto text-black">
+    <div className="max-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-100 p-4 md:p-8 w-full max-w-screen-2xl mx-auto text-black">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-8 gap-4">
-        <h1 className="text-3xl font-extrabold text-indigo-700 tracking-tight">Products</h1>
+        <h1 className="text-3xl font-extrabold text-indigo-700 tracking-tight">Products Demand</h1>
       </div>
 
       <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6 gap-4">
@@ -58,7 +58,7 @@ const ProductsDemand = () => {
         </div>
       </div>
  
-      <div className="overflow-x-auto bg-white border border-gray-200 rounded-2xl shadow-lg">
+      <div className="overflow-x-auto bg-white border border-gray-200 rounded-2xl shadow-lg max-h-[calc(100vh-350px)] overflow-y-scroll">
         <table className="min-w-full text-base">
           <thead className="bg-gradient-to-r from-indigo-50 to-blue-50 text-gray-600 font-semibold">
             <tr>
@@ -95,7 +95,7 @@ const ProductsDemand = () => {
                 <td className="px-4 py-3 font-semibold">PKR {product.cost_price.toLocaleString()}</td>
                 <td className="px-4 py-3 font-semibold">PKR {product.sale_price.toLocaleString()}</td>
                 <td className="px-4 py-3 font-semibold">{product.min_stock_level}</td>
-                <td className="px-4 py-3 font-semibold">{product.min_stock_level - product.stock}</td>
+                <td className="px-4 py-3 font-semibold bg-amber-800 text-white">Order Stock</td>
               </tr>
             ))}
           </tbody>

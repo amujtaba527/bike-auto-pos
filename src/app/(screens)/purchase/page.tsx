@@ -136,10 +136,12 @@ const handleDeletePurchase = async (id: number) => {
             ) : filterPurchaseByDate(purchases).filter((purchase) => {
               const vendorName = vendors.find((vendor) => vendor.id === purchase.vendor_id)?.name?.toLowerCase() || '';
               const searchTerm = search.toLowerCase();
+              const invoiceStr = (purchase.invoice_number ?? '').toString().toLowerCase();
+              const dateStr = (purchase.purchase_date ?? '').toString();
               
-              return purchase.invoice_number.toLowerCase().includes(searchTerm) || 
+              return invoiceStr.includes(searchTerm) || 
                      vendorName.includes(searchTerm) || 
-                     purchase.purchase_date.includes(search);
+                     dateStr.includes(search);
             }).length === 0 ? (
               <tr>
                 <td colSpan={6} className="px-4 py-8 text-center text-gray-500">
@@ -150,14 +152,16 @@ const handleDeletePurchase = async (id: number) => {
             filterPurchaseByDate(purchases).filter((purchase) => {
               const vendorName = vendors.find((vendor) => vendor.id === purchase.vendor_id)?.name?.toLowerCase() || '';
               const searchTerm = search.toLowerCase();
+              const invoiceStr = (purchase.invoice_number ?? '').toString().toLowerCase();
+              const dateStr = (purchase.purchase_date ?? '').toString();
               
-              return purchase.invoice_number.toLowerCase().includes(searchTerm) || 
+              return invoiceStr.includes(searchTerm) || 
                      vendorName.includes(searchTerm) || 
-                     purchase.purchase_date.includes(search);
+                     dateStr.includes(search);
             }).map((purchase) => (
               <tr key={purchase.id} className="hover:bg-gray-50">
                 <td className="px-4 py-3">#{purchase.invoice_number}</td>
-                <td className="px-4 py-3">{purchase.purchase_date.slice(0, 10)}</td>
+                <td className="px-4 py-3">{purchase.purchase_date ? purchase.purchase_date.slice(0, 10) : '-'}</td>
                 <td className="px-4 py-3">{vendors.find(vendor => vendor.id === purchase.vendor_id)?.name}</td>
                 <td className="px-4 py-3 font-semibold">PKR {purchase.total_amount}</td>
                 <td className="px-4 py-3 flex space-x-2">

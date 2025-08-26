@@ -134,15 +134,16 @@ const EditPurchase = ({ params }: PageProps) => {
   
   const subtotal = products.reduce((acc, p) =>
     acc + (p.cost_price * p.stock), 0);
+  const NumberSubtotal = Number(subtotal).toFixed(2);
 
   const calcOrderDiscount = () => {
     return orderDiscountType === "%"
-      ? subtotal * (orderDiscount / 100)
-      : orderDiscount;
+      ? Number(NumberSubtotal) * (orderDiscount / 100)
+      : Number(orderDiscount);
   };
 
-  const tax = subtotal * 0.00; // 0% tax
-  const grandTotal = subtotal - calcOrderDiscount() + tax;
+  const tax = Number(NumberSubtotal) * 0.00; // 0% tax
+  const grandTotal = Number(NumberSubtotal) - Number(calcOrderDiscount()) + Number(tax);
   
   const handleUpdatePurchase = async () => {
     try {
@@ -171,6 +172,7 @@ const EditPurchase = ({ params }: PageProps) => {
       
       const payload = {
         vendor_id: vendor.id,
+        purchase_date: date,
         invoice_number: invoiceNumber,
         subtotal: subtotal,
         tax_amount: tax,
@@ -215,7 +217,7 @@ const EditPurchase = ({ params }: PageProps) => {
             <h1 className="text-2xl font-bold text-gray-800">Edit Purchase</h1>
             <div className="flex items-center gap-4 mt-2 text-sm text-gray-600">
               <span>Invoice: <span className="font-medium text-gray-800">#{invoiceNumber}</span></span>
-              <span>Date: <span className="font-medium text-gray-800">{date}</span></span>
+              <span>Date: <span className="font-medium text-gray-800"><input type="date" value={date} onChange={(e) => setDate(e.target.value)} /></span></span>
               <span>Vendor: <span className="font-medium text-gray-800">{vendor?.name || 'Not selected'}</span></span>
             </div>
           </div>
@@ -471,7 +473,7 @@ const EditPurchase = ({ params }: PageProps) => {
             <div className="space-y-3 border-t border-gray-200 pt-4">
               <div className="flex justify-between text-gray-600">
                 <span>Subtotal:</span>
-                <span className="font-medium">PKR {subtotal}</span>
+                <span className="font-medium">PKR {NumberSubtotal}</span>
               </div>
               <div className="flex justify-between text-gray-600">
                 <span>Tax:</span>
