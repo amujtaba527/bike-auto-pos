@@ -3,14 +3,15 @@
 import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import React, { useMemo } from 'react';
-import { Home, LogOut, Package, Plus, RotateCcw, ShoppingCart, User } from 'lucide-react';
+import {LogOut, Package, Plus, RotateCcw, ShoppingCart, User, ClipboardList } from 'lucide-react';
 
 const getSidebarMenu = (pathname: string) => {
   if (pathname.startsWith("/product")) {
     return [
       { href: "/product", icon: Package, text: "Products" },
       { href: "/product/categories", icon: Plus, text: "Category & Brand" },
-      { href: "/product/demand", icon: RotateCcw, text: "Product Demand" }
+      { href: "/product/demand", icon: RotateCcw, text: "Product Demand" },
+      { href: "/product/report", icon: ClipboardList, text: "Product Report" },
     ];
   }
 
