@@ -36,7 +36,8 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
         typeof body.tax_amount !== "number" ||
         typeof body.total_amount !== "number" || 
         typeof body.amount_paid !== "number" ||
-        typeof body.items !== "object") {
+        typeof body.sale_date !== "string" ||
+        !Array.isArray(body.items)) {
       return NextResponse.json({ error: "Invalid sale details" }, { status: 400 });
     }
 
@@ -106,8 +107,8 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
 
     // Update sale record
     const res = await client.query(
-      "UPDATE sales SET invoice_number = $1, customer_id = $2, subtotal = $3, discount = $4, tax_amount = $5, total_amount = $6, amount_paid = $7, updated_at = CURRENT_TIMESTAMP WHERE id = $8 RETURNING *", 
-      [body.invoice_number, body.customer_id, body.subtotal, body.discount, body.tax_amount, body.total_amount, body.amount_paid, id]
+      "UPDATE sales SET invoice_number = $1, customer_id = $2, subtotal = $3, discount = $4, tax_amount = $5, total_amount = $6, amount_paid = $7, sale_date = $8, updated_at = CURRENT_TIMESTAMP WHERE id = $9 RETURNING *", 
+      [body.invoice_number, body.customer_id, body.subtotal, body.discount, body.tax_amount, body.total_amount, body.amount_paid, body.sale_date, id]
     );
     
     const updatedSale = res.rows[0];
@@ -144,6 +145,20 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
         await client.query(
           "UPDATE products SET stock = stock - $1 WHERE id = $2", 
           [quantityDifference, item.id]
+        );
+      }
+    }
+
+    // Handle removed products (items that existed before but are not in the new list)
+    const newItemIds = new Set(body.items.map((i: any) => i.id));
+    for (const productId in originalQuantities) {
+      const pid = parseInt(productId);
+      if (!newItemIds.has(pid)) {
+        const oldQty = originalQuantities[pid];
+        // Add back stock for removed sale item
+        await client.query(
+          "UPDATE products SET stock = stock + $1 WHERE id = $2",
+          [oldQty, pid]
         );
       }
     }

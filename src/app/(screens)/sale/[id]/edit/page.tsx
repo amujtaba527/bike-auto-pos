@@ -157,15 +157,16 @@ const EditSale = ({ params }: { params: Promise<{ id: string }> }) => {
 
   const subtotal = products.reduce((acc, p) =>
     acc + (p.sale_price * p.quantity), 0);
+  const NumberSubtotal = Number(subtotal).toFixed(2);
 
   const calcOrderDiscount = () => {
     return orderDiscountType === "%"
-      ? subtotal * (orderDiscount / 100)
-      : orderDiscount;
+      ? Number(NumberSubtotal) * (orderDiscount / 100)
+      : Number(orderDiscount);
   };
 
-  const tax = subtotal * 0.00; // 0% tax
-  const grandTotal = subtotal - calcOrderDiscount() + tax;
+  const tax = Number(NumberSubtotal) * 0.00; // 0% tax
+  const grandTotal = Number(NumberSubtotal) - Number(calcOrderDiscount()) + Number(tax);
 
   const handleUpdateSale = async () => {
     try {
@@ -176,6 +177,18 @@ const EditSale = ({ params }: { params: Promise<{ id: string }> }) => {
       if (products.length === 0) {
         alert('Please add at least one product');
         return;
+      }
+
+      // Validate that all products have valid quantities and prices
+      for (const product of products) {
+        if (!product.quantity || product.quantity <= 0) {
+          alert(`Please enter a valid quantity for ${product.name}`);
+          return;
+        }
+        if (!product.sale_price || product.sale_price <= 0) {
+          alert(`Please enter a valid unit price for ${product.name}`);
+          return;
+        }
       }
       
       setEditLoading(true);
@@ -188,6 +201,7 @@ const EditSale = ({ params }: { params: Promise<{ id: string }> }) => {
         tax_amount: tax,
         total_amount: grandTotal,
         amount_paid: grandTotal, // Cash-only system
+        sale_date: date,
         items: products.map(p => ({
           id: p.id,
           quantity: p.quantity,
@@ -244,7 +258,7 @@ const EditSale = ({ params }: { params: Promise<{ id: string }> }) => {
             <h1 className="text-2xl font-bold text-gray-800">Edit Sale</h1>
             <div className="flex items-center gap-4 mt-2 text-sm text-gray-600">
               <span>Invoice: <span className="font-medium text-gray-800">#{invoiceNumber}</span></span>
-              <span>Date: <span className="font-medium text-gray-800">{date}</span></span>
+              <span>Date: <span className="font-medium text-gray-800"><input type="date" value={date} onChange={(e) => setDate(e.target.value)} /></span></span>
               <span>Customer: <span className="font-medium text-gray-800">{customer?.name || 'Not selected'}</span></span>
             </div>
           </div>
@@ -432,7 +446,16 @@ const EditSale = ({ params }: { params: Promise<{ id: string }> }) => {
                               </button>
                             </div>
                           </td>
-                          <td className="py-4 px-4 text-right font-medium">PKR {product.sale_price}</td>
+                          <td className="py-4 px-4 text-right">
+                            <input
+                              type="number"
+                              value={product.sale_price}
+                              onChange={(e) => updateProduct(product.id, 'sale_price', Number(e.target.value) || 0)}
+                              className="w-24 px-2 py-1 text-right border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              step="0.01"
+                              min="0"
+                            />
+                          </td>
                           <td className="py-4 px-4 text-right font-semibold">PKR {(product.sale_price * product.quantity).toFixed(2)}</td>
                           <td className="py-4 px-4 text-center">
                             <button
@@ -485,7 +508,7 @@ const EditSale = ({ params }: { params: Promise<{ id: string }> }) => {
             <div className="space-y-3 border-t border-gray-200 pt-4">
               <div className="flex justify-between text-gray-600">
                 <span>Subtotal:</span>
-                <span className="font-medium">PKR {subtotal}</span>
+                <span className="font-medium">PKR {NumberSubtotal}</span>
               </div>
               <div className="flex justify-between text-gray-600">
                 <span>Tax:</span>
