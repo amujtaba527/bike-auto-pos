@@ -1,5 +1,5 @@
 'use client';
-import { Plus, Search, Pencil, Trash } from 'lucide-react';
+import { Plus, Search, Pencil, Trash, ChevronUp, ChevronDown } from 'lucide-react';
 import React, { useEffect, useState } from 'react';
 import { Product, Brand, Category } from '@/types/types';
 import dynamic from "next/dynamic";
@@ -12,12 +12,15 @@ const Products = () => {
   const [showAddModal, setShowAddModal] = useState(false);
   const [brands, setBrands] = useState<Brand[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  // Sorting state
+  const [sortKey, setSortKey] = useState<'sku' | 'name' | 'brand' | 'category' | null>(null);
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
   const [newProduct, setNewProduct] = useState({
     name: '',
     sku: '',
     description: '',
     cost_price: '',
-    sale_price: '', 
+    sale_price: '',
     brand_id: '',
     category_id: '',
     min_stock_level: '2',
@@ -28,6 +31,19 @@ const Products = () => {
   const [isEditMode, setIsEditMode] = useState(false); // New state for mode
   const [editingProductId, setEditingProductId] = useState<number | null>(null); // ID of the product being edited
   const [editLoading, setEditLoading] = useState(false); // Use one loading state or separate if needed
+
+
+  // Handle column sort
+  const handleSort = (key: 'sku' | 'name' | 'brand' | 'category') => {
+    if (sortKey === key) {
+      setSortDir(prev => (prev === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortKey(key);
+      setSortDir('asc');
+    }
+  };
+
+
 
   // --- Unified handleEditClick ---
   const handleEditClick = (product: Product) => {
@@ -56,7 +72,7 @@ const Products = () => {
     } else {
       setLoading(true);
     }
-   
+
     try {
       let res;
       if (isEditMode && editingProductId !== null) {
@@ -75,7 +91,7 @@ const Products = () => {
             min_stock_level: Number(newProduct.min_stock_level),
             // stock is not sent, so it won't be changed
           }),
-        });  
+        });
         if (!res.ok) {
           const errorData = await res.json().catch(() => ({}));
           throw new Error(errorData.error || 'Failed to update product');
@@ -110,7 +126,7 @@ const Products = () => {
       const productsArray = Array.isArray(refreshed) ? refreshed : refreshed.products || [];
       setProducts(productsArray);
 
-    } catch (err:unknown) {
+    } catch (err: unknown) {
       alert((err as Error).message);
     } finally {
       // Reset appropriate loading state
@@ -210,6 +226,44 @@ const Products = () => {
     categories.find((c: Category) => c.id === product.category_id)?.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  // Apply sorting on filtered products
+  const sortedFilteredProducts = React.useMemo(() => {
+    const arr = [...filteredProducts];
+    if (!sortKey) return arr;
+
+    const getBrandName = (p: Product) =>
+      (brands.find(b => b.id === p.brand_id)?.name || '').toLowerCase();
+    const getCategoryName = (p: Product) =>
+      (categories.find(c => c.id === p.category_id)?.name || '').toLowerCase();
+
+    arr.sort((a, b) => {
+      let va = '';
+      let vb = '';
+      switch (sortKey) {
+        case 'sku':
+          va = (a.sku || '').toLowerCase();
+          vb = (b.sku || '').toLowerCase();
+          break;
+        case 'name':
+          va = (a.name || '').toLowerCase();
+          vb = (b.name || '').toLowerCase();
+          break;
+        case 'brand':
+          va = getBrandName(a);
+          vb = getBrandName(b);
+          break;
+        case 'category':
+          va = getCategoryName(a);
+          vb = getCategoryName(b);
+          break;
+      }
+      if (va < vb) return sortDir === 'asc' ? -1 : 1;
+      if (va > vb) return sortDir === 'asc' ? 1 : -1;
+      return 0;
+    });
+    return arr;
+  }, [filteredProducts, sortKey, sortDir, brands, categories]);
+
   return (
     <div className="max-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-100 p-4 md:p-8 w-full max-w-screen-2xl mx-auto">
       {/* Add/Edit Product Modal */}
@@ -278,7 +332,7 @@ const Products = () => {
                   className="w-full px-4 py-2 border rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-200"
                   disabled={isEditMode && editLoading} // Shouldn't be needed, but good practice
                 /> */}
-              
+
               {/* SKU */}
               <label htmlFor="sku">SKU</label>
               <input
@@ -379,11 +433,47 @@ const Products = () => {
           <thead className="bg-gradient-to-r from-indigo-50 to-blue-50 text-gray-600 font-semibold sticky top-0 z-10">
             <tr>
               <th className="px-4 py-3 text-left">ID</th>
-              <th className="px-4 py-3 text-left">SKU</th>
-              <th className="px-4 py-3 text-left">Product</th>
+              <th
+                className="px-4 py-3 text-left cursor-pointer select-none"
+                onClick={() => handleSort('sku')}
+              >
+                <div className="inline-flex items-center gap-1">
+                  SKU
+                  <ChevronUp size={16} className={`${sortKey === 'sku' && sortDir === 'asc' ? 'text-indigo-600' : 'text-gray-400'}`} />
+                  <ChevronDown size={16} className={`${sortKey === 'sku' && sortDir === 'desc' ? 'text-indigo-600' : 'text-gray-400'}`} />
+                </div>
+              </th>
+              <th
+                className="px-4 py-3 text-left cursor-pointer select-none"
+                onClick={() => handleSort('name')}
+              >
+                <div className="inline-flex items-center gap-1">
+                  Product
+                  <ChevronUp size={16} className={`${sortKey === 'name' && sortDir === 'asc' ? 'text-indigo-600' : 'text-gray-400'}`} />
+                  <ChevronDown size={16} className={`${sortKey === 'name' && sortDir === 'desc' ? 'text-indigo-600' : 'text-gray-400'}`} />
+                </div>
+              </th>
               <th className="px-4 py-3 text-left">Stock</th>
-              <th className="px-4 py-3 text-left">Brand</th>
-              <th className="px-4 py-3 text-left">Category</th>
+              <th
+                className="px-4 py-3 text-left cursor-pointer select-none"
+                onClick={() => handleSort('brand')}
+              >
+                <div className="inline-flex items-center gap-1">
+                  Brand
+                  <ChevronUp size={16} className={`${sortKey === 'brand' && sortDir === 'asc' ? 'text-indigo-600' : 'text-gray-400'}`} />
+                  <ChevronDown size={16} className={`${sortKey === 'brand' && sortDir === 'desc' ? 'text-indigo-600' : 'text-gray-400'}`} />
+                </div>
+              </th>
+              <th
+                className="px-4 py-3 text-left cursor-pointer select-none"
+                onClick={() => handleSort('category')}
+              >
+                <div className="inline-flex items-center gap-1">
+                  Category
+                  <ChevronUp size={16} className={`${sortKey === 'category' && sortDir === 'asc' ? 'text-indigo-600' : 'text-gray-400'}`} />
+                  <ChevronDown size={16} className={`${sortKey === 'category' && sortDir === 'desc' ? 'text-indigo-600' : 'text-gray-400'}`} />
+                </div>
+              </th>
               <th className="px-4 py-3 text-left">Cost Price (PKR)</th>
               <th className="px-4 py-3 text-left">Selling Price (PKR)</th>
               <th className="px-4 py-3 text-left">Actions</th>
@@ -405,7 +495,7 @@ const Products = () => {
                 </td>
               </tr>
             ) : (
-              filteredProducts.map((product) => (
+              sortedFilteredProducts.map((product) => (
                 <tr key={product.id} className="hover:bg-gray-50">
                   <td className="px-4 py-3 font-semibold">{product.id}</td>
                   <td className="px-4 py-3 font-semibold">{product.sku}</td>
@@ -418,11 +508,10 @@ const Products = () => {
                   <td className="px-4 py-3 flex gap-2">
                     {/* Edit Button */}
                     <button
-                      className={`p-2 rounded ${
-                        isEditMode || editLoading || loading // Disable if any operation is active
+                      className={`p-2 rounded ${isEditMode || editLoading || loading // Disable if any operation is active
                           ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                           : 'bg-yellow-500 hover:bg-yellow-600 text-white'
-                      }`}
+                        }`}
                       onClick={() => handleEditClick(product)}
                       disabled={isEditMode || editLoading || loading} // Disable based on state
                       aria-label="Edit"
@@ -432,11 +521,10 @@ const Products = () => {
 
                     {/* Delete Button */}
                     <button
-                      className={`p-2 rounded ${
-                        isEditMode || editLoading || loading // Disable if any operation is active
+                      className={`p-2 rounded ${isEditMode || editLoading || loading // Disable if any operation is active
                           ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                           : 'bg-red-600 hover:bg-red-700 text-white'
-                      }`}
+                        }`}
                       onClick={() => handleDelete(product.id)}
                       disabled={isEditMode || editLoading || loading} // Disable based on state
                       aria-label="Delete"
