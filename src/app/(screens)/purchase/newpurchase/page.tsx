@@ -91,7 +91,7 @@ const NewPurchase = () => {
         // Update quantity if product already exists
         setProducts(products.map((p: Product) =>
           p.id === productId
-            ? { ...p, stock: p.stock + tempQuantity }
+            ? { ...p, stock: p.stock + tempQuantity, cost_price: tempCostPrice }
             : p
         ));
       } else {
@@ -243,26 +243,7 @@ const NewPurchase = () => {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-semibold font-medium text-gray-700 mb-1">Invoice #</label>
-                  <p>{invoiceNumber}</p>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
-                  <input
-                    type="date"
-                    value={date}
-                    onChange={(e) => setDate(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Vendor Selection */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-              <h2 className="text-lg font-semibold text-gray-800 mb-4">Vendor Selection</h2>
-              <div className="flex justify-between mb-4">
-                <div className="w-2/3">
+                  <label className="block text-semibold font-medium text-gray-700 mb-1">Vendor Selection</label>
                   <Select
                     options={vendors.map(vendor => ({
                       value: vendor.id,
@@ -280,8 +261,18 @@ const NewPurchase = () => {
                     classNamePrefix="react-select"
                   />
                 </div>
-                <div className="flex-1 flex items-center justify-center">
-                <User size={60} className="text-blue-400" />
+                <div>
+                  <label className="block text-semibold font-medium text-gray-700 mb-1">Invoice #</label>
+                  <p>{invoiceNumber}</p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
+                  <input
+                    type="date"
+                    value={date}
+                    onChange={(e) => setDate(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
                 </div>
               </div>
             </div>
@@ -370,9 +361,9 @@ const NewPurchase = () => {
                   <div className="text-sm">Start by searching and adding products above</div>
                 </div>
               ) : (
-                <div className="overflow-x-auto">
+                <div className="overflow-x-auto max-h-[calc(100vh-520px)] overflow-y-auto relative">
                   <table className="w-full">
-                    <thead className="bg-gray-50 border-b border-gray-200">
+                    <thead className="bg-gray-50 border-b border-gray-200 sticky top-0">
                       <tr>
                         <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Product Name / SKU / Barcode</th>
                         <th className="px-4 py-3 text-center text-sm font-medium text-gray-700">Qty</th>
