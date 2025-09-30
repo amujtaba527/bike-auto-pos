@@ -5,11 +5,17 @@ import { v4 as uuidv4 } from "uuid";
 import dynamic from "next/dynamic";
 const Select = dynamic(() => import('react-select'), { ssr: false });
 
+type Brand = {
+  id: number;
+  name: string;
+}
+
 type Product = {
   id: number;
   name: string;
   sku: string;
   sale_price: number;
+  brand_id: number;
   stock: number;
   quantity: number;
 };
@@ -30,6 +36,7 @@ const NewSale = () => {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [allProducts, setAllProducts] = useState<Product[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  const [brands, setBrands] = useState<Brand[]>([]);
   const [orderDiscount, setOrderDiscount] = useState<number>(0);
   const [orderDiscountType, setOrderDiscountType] = useState<"%" | "PKR">("PKR");
   const [selectedProductId, setSelectedProductId] = useState<number | null>(null);
@@ -71,6 +78,9 @@ const NewSale = () => {
           });
         }
       });
+    fetch('/api/brand')
+      .then(res => res.json())
+      .then(data => setBrands(Array.isArray(data) ? data : data.brands || []));
     fetch('/api/product')
       .then(res => res.json())
       .then(data => setAllProducts(Array.isArray(data) ? data : data.products || []));
@@ -94,7 +104,7 @@ const NewSale = () => {
       if (existingProduct) {
         setProducts(products.map((p: Product) =>
           p.id === productId
-            ? { ...p, quantity: p.quantity + tempQuantity }
+            ? { ...p, quantity: p.quantity + tempQuantity, sale_price: rate }
             : p
         ));
       } else {
@@ -102,7 +112,8 @@ const NewSale = () => {
           id: prod.id,
           name: prod.name,
           sku: prod.sku || '',
-          sale_price: prod.sale_price || 0,
+          brand_id: prod.brand_id || 0,
+          sale_price: rate ||prod.sale_price || 0,
           stock: prod.stock || 0,
           quantity: tempQuantity,
         };
@@ -196,7 +207,7 @@ const NewSale = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4">
+    <div className="max-h-screen bg-gray-50 p-4 md:p-8 w-full max-w-screen-2xl mx-auto">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-4">
@@ -239,26 +250,8 @@ const NewSale = () => {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-semibold font-medium text-gray-700 mb-1">Invoice #</label>
-                  <p>{invoiceNumber}</p>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
-                  <input
-                    type="date"
-                    value={date}
-                    onChange={(e) => setDate(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-              </div>
-            </div>
-            {/* Customer Selection */}
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-  <h2 className="text-lg font-semibold text-gray-800 mb-4 flex">Customer Selection</h2>
-  <div className="flex justify-between mb-4">
-    <div className="w-2/3">
-      <Select
+                <label className="block text-sm font-medium text-gray-700 mb-1">Customer Selection</label>
+              <Select
         options={customers.map(customer => ({
           value: customer.id,
           label: customer.name,
@@ -274,13 +267,22 @@ const NewSale = () => {
         isSearchable
         classNamePrefix="react-select"
       />
-    </div>
-    <div className="flex-1 flex items-center justify-center">
-      <User size={60} className="text-blue-400" />
-    </div>
-  </div>
-</div>
-
+              </div>
+                <div>
+                  <label className="block text-semibold font-medium text-gray-700 mb-1">Invoice #</label>
+                  <p>{invoiceNumber}</p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
+                  <input
+                    type="date"
+                    value={date}
+                    onChange={(e) => setDate(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              </div>
+            </div>
             {/* Product Search and Add */}
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
               <div className="flex gap-2 items-end">
@@ -291,7 +293,7 @@ const NewSale = () => {
                   <Select
                     options={allProducts.map(product => ({
                       value: product.id,
-                      label: `${product.name} (SKU: ${product.sku}, PKR ${product.sale_price})`,
+                      label: `${product.name} (SKU: ${product.sku}, PKR ${product.sale_price}, Brand: ${brands.find((brand: Brand) => brand.id === product.brand_id)?.name})`,
                       ...product
                     }))}
                     value={selectedProductOption}
@@ -362,9 +364,9 @@ const NewSale = () => {
                   <div className="text-sm">Start by searching and adding products above</div>
                 </div>
               ) : (
-                <div className="overflow-x-auto">
+                <div className="overflow-x-auto max-h-[calc(100vh-520px)] overflow-y-auto relative">
                   <table className="w-full">
-                    <thead className="bg-gray-50 border-b border-gray-200">
+                    <thead className="bg-gray-50 border-b border-gray-200 sticky top-0 ">
                       <tr>
                         <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Product Name / SKU / Barcode</th>
                         <th className="px-4 py-3 text-center text-sm font-medium text-gray-700">Qty</th>
@@ -378,7 +380,7 @@ const NewSale = () => {
                         <tr key={product.id} className="hover:bg-gray-50">
                           <td className="px-4 py-3">
                             <div className="font-medium text-gray-900">{product.name}</div>
-                            <div className="text-sm text-gray-500">SKU: {product.sku}</div>
+                            <div className="text-sm text-gray-500">SKU: {product.sku} Stock: {product.stock} Brand: {brands.find((brand: Brand) => brand.id === product.brand_id)?.name}</div>
                           </td>
                           <td className="px-4 py-3 text-center">
                             <div className="flex items-center justify-center gap-2">
