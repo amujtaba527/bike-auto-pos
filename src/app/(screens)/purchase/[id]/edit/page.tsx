@@ -3,10 +3,20 @@ import { MinusIcon, PlusIcon } from "lucide-react";
 import React, { useState, useEffect } from "react";
 import { use } from "react";
 import { useRouter } from "next/navigation";
-import { Product, Vendor, PurchaseRecord, PurchaseItem } from '@/types/types';
+import { Vendor, PurchaseItem, Brand } from '@/types/types';
+import dynamic from 'next/dynamic';
+const Select = dynamic(() => import('react-select'), { ssr: false });
 
 interface PageProps {
   params: Promise<{ id: string }>;
+}
+interface Product {
+  id: number;
+  name: string;
+  sku: string;
+  cost_price: number;
+  brand_id: number;
+  stock: number;
 }
 
 const EditPurchase = ({ params }: PageProps) => {
@@ -22,6 +32,8 @@ const EditPurchase = ({ params }: PageProps) => {
   const [products, setProducts] = useState<Product[]>([]);
   const [orderDiscount, setOrderDiscount] = useState<number>(0);
   const [orderDiscountType, setOrderDiscountType] = useState<'%' | 'PKR'>('PKR');
+  const [selectedProductOption, setSelectedProductOption] = useState <any> (null);
+  const [allbrands, setAllbrands] = useState<Brand[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedProductId, setSelectedProductId] = useState<number | null>(null);
   const [tempQuantity, setTempQuantity] = useState<number>(1);
@@ -58,6 +70,11 @@ const EditPurchase = ({ params }: PageProps) => {
         const productsRes = await fetch('/api/product');
         const productsData = await productsRes.json();
         setAllProducts(Array.isArray(productsData) ? productsData : productsData.products || []);
+
+        // Fetch brands
+        const brandsRes = await fetch('/api/brand');
+        const brandsData = await brandsRes.json();
+        setAllbrands(Array.isArray(brandsData) ? brandsData : brandsData.brands || []);
         
         // Set purchase items as products
         const purchaseItems = purchaseData.items;
@@ -72,9 +89,7 @@ const EditPurchase = ({ params }: PageProps) => {
             sku: product?.sku || '',
             cost_price: item.unit_price,
             stock: item.quantity,
-            sale_price: product?.sale_price || 0,
-            description: product?.description || '',
-            min_stock_level: product?.min_stock_level || 0,
+            brand_id: product?.brand_id || 0,
           };
         });
         
@@ -108,11 +123,7 @@ const EditPurchase = ({ params }: PageProps) => {
         sku: prod.sku || '',
         cost_price: tempCostPrice || prod.cost_price || 0,
         stock: tempQuantity,
-        sale_price: prod.sale_price || 0,
-        description: prod.description || '',
-        min_stock_level: prod.min_stock_level || 0,
         brand_id: prod.brand_id || 0,
-        category_id: prod.category_id || 0,
       };
       setProducts([...products, newProduct]);
     }
@@ -278,43 +289,22 @@ const EditPurchase = ({ params }: PageProps) => {
             <h2 className="text-lg font-semibold text-gray-800 mb-4">Add Products</h2>
             <div className="flex gap-3 mb-4">
               <div className="flex-1 relative">
-                <input
-                  type="text"
-                  placeholder="Search products by name or SKU..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-                {searchTerm && (
-                  <div className="absolute top-full left-0 right-0 bg-white border border-gray-300 rounded-lg mt-1 max-h-48 overflow-y-auto z-10">
-                    {allProducts
-                      .filter(p => 
-                        p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                        p.sku.toLowerCase().includes(searchTerm.toLowerCase())
-                      )
-                      .slice(0, 10)
-                      .map(product => (
-                        <button
-                          key={product.id}
-                          onClick={() => setSelectedProductId(product.id)}
-                          className={`w-full text-left px-4 py-3 hover:bg-gray-50 border-b border-gray-100 last:border-b-0 ${
-                            selectedProductId === product.id ? 'bg-blue-50' : ''
-                          }`}
-                        >
-                          <div className="flex justify-between items-center">
-                            <div>
-                              <div className="font-medium">{product.name}</div>
-                              <div className="text-sm text-gray-500">SKU: {product.sku}</div>
-                            </div>
-                            <div className="text-right">
-                              <div className="font-medium">PKR {product.cost_price}</div>
-                            </div>
-                          </div>
-                        </button>
-                      ))
-                    }
-                  </div>
-                )}
+                <Select
+                    options={allProducts.map(product => ({
+                      value: product.id,
+                      label: `${product.name} (SKU: ${product.sku}, PKR ${product.cost_price}, Brand: ${allbrands.find(b => b.id === product.brand_id)?.name})`,
+                      ...product
+                    }))}
+                    value={selectedProductOption}
+                    onChange={(option: any) => {
+                      if (!option) return;
+                      setSelectedProductOption(option);
+                      setSelectedProductId(option.value);
+                    }}
+                    placeholder="Search or select a product..."
+                    isSearchable
+                    classNamePrefix="react-select"
+                  />
               </div>
               <div className="flex items-center gap-2">
                 <button
@@ -338,15 +328,6 @@ const EditPurchase = ({ params }: PageProps) => {
                   <PlusIcon className="w-4 h-4" />
                 </button>
               </div>
-              <input
-                type="number"
-                placeholder="Cost Price"
-                value={tempCostPrice}
-                onChange={(e) => setTempCostPrice(Number(e.target.value) || 0)}
-                className="w-32 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                step="0.01"
-                min="0"
-              />
               <button
                 onClick={() => selectedProductId && handleAddProduct(selectedProductId)}
                 disabled={!selectedProductId}
@@ -385,6 +366,7 @@ const EditPurchase = ({ params }: PageProps) => {
                         <tr key={product.id} className="border-b border-gray-100">
                           <td className="py-4 px-4">
                             <div className="font-medium text-gray-900">{product.name}</div>
+                            <div className="text-sm text-gray-500">Brand: {allbrands.find(b => b.id === product.brand_id)?.name}</div>
                           </td>
                           <td className="py-4 px-4 text-gray-600">{product.sku}</td>
                           <td className="py-4 px-4">
