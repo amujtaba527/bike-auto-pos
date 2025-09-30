@@ -32,15 +32,22 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const brandId = searchParams.get("brandId") ? Number(searchParams.get("brandId")) : undefined;
     const productId = searchParams.get("productId") ? Number(searchParams.get("productId")) : undefined;
+    const rawType = searchParams.get("transactionType");
+    const transactionType: 'all' | 'sale' | 'purchase' = rawType === 'sale' || rawType === 'purchase' ? rawType : 'all';
     const from = searchParams.get("from") || undefined; // ISO string/date
     const to = searchParams.get("to") || undefined; // ISO string/date
 
-    const filters = { brandId, productId, from, to };
+    const baseFilters = { brandId, productId, from, to };
 
-    const purchaseCond = buildConditions(1, filters, "pu.purchase_date");
-    const saleCond = buildConditions(purchaseCond.nextIndex, filters, "s.sale_date");
+    let paramIndex = 1;
+    const parts: string[] = [];
+    const allParams: any[] = [];
 
-    const sql = `
+    // Include purchases unless explicitly filtered to only 'sale'
+    if (transactionType !== 'sale') {
+      const purchaseCond = buildConditions(paramIndex, baseFilters, "pu.purchase_date");
+      paramIndex = purchaseCond.nextIndex;
+      parts.push(`
       SELECT 'purchase' AS type,
              p.name AS product_name,
              p.sku,
@@ -52,7 +59,15 @@ export async function GET(request: Request) {
       JOIN purchases pu ON pi.purchase_id = pu.id
       JOIN products p ON pi.product_id = p.id
       ${purchaseCond.where}
-      UNION ALL
+      `);
+      allParams.push(...purchaseCond.params);
+    }
+
+    // Include sales unless explicitly filtered to only 'purchase'
+    if (transactionType !== 'purchase') {
+      const saleCond = buildConditions(paramIndex, baseFilters, "s.sale_date");
+      paramIndex = saleCond.nextIndex;
+      parts.push(`
       SELECT 'sale' AS type,
              p.name AS product_name,
              p.sku,
@@ -64,11 +79,25 @@ export async function GET(request: Request) {
       JOIN sales s ON si.sale_id = s.id
       JOIN products p ON si.product_id = p.id
       ${saleCond.where}
-      ORDER BY date DESC
+      `);
+      allParams.push(...saleCond.params);
+    }
+
+    // If nothing selected (shouldn't happen), return empty array
+    if (parts.length === 0) {
+      return NextResponse.json([]);
+    }
+
+    const sql = `
+      SELECT * FROM (
+        ${parts.join(" UNION ALL ")}
+      ) AS t
+      ORDER BY
+        CASE WHEN t.type = 'purchase' THEN 0 ELSE 1 END,
+        t.date DESC
     `;
 
-    const params = [...purchaseCond.params, ...saleCond.params];
-    const result = await pool.query(sql, params);
+    const result = await pool.query(sql, allParams);
     return NextResponse.json(result.rows);
   } catch (error: any) {
     console.error("/api/productreport error:", error);

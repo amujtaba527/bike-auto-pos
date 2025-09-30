@@ -27,6 +27,8 @@ const ProductReportPage = () => {
   const [fromDate, setFromDate] = useState<string>('');
   const [toDate, setToDate] = useState<string>('');
 
+  const [transactionType, setTransactionType] = useState<'all' | 'sale' | 'purchase'>('all');
+
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [rows, setRows] = useState<ReportRow[]>([]);
@@ -85,6 +87,7 @@ const ProductReportPage = () => {
       const params = new URLSearchParams();
       if (selectedBrandId) params.set('brandId', String(selectedBrandId));
       if (selectedProductId) params.set('productId', String(selectedProductId));
+      if (transactionType !== 'all') params.set('transactionType', transactionType);
       if (fromDate) params.set('from', fromDate);
       if (toDate) params.set('to', toDate);
 
@@ -147,6 +150,16 @@ const ProductReportPage = () => {
                 menu: (base: any) => ({ ...base, zIndex: 9999 })
               }}
             />
+          </div>
+
+          {/* Transaction Type */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Transaction Type</label>
+              <select name="transaction_type" id="transaction_type" className="w-full px-3 py-2 border rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-200" onChange={(e) => setTransactionType(e.target.value as 'all' | 'sale' | 'purchase')}>
+                <option value="all">All</option>
+                <option value="sale">Sale</option>
+                <option value="purchase">Purchase</option>
+              </select>
           </div>
 
           {/* From Date */}
