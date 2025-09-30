@@ -10,8 +10,9 @@ export default function SalesPage() {
   const [sales, setSales] = useState<SaleRecord[]>([]);
   const [search, setSearch] = useState('');
   const [customers, setCustomers] = useState<Customer[]>([]);
-  const [dateFilter, setDateFilter] = useState('all');
   const [loading, setLoading] = useState(false);
+  const [fromDate, setFromDate] = useState<string>('');
+  const [toDate, setToDate] = useState<string>(new Date().toISOString().split('T')[0]);
 
   useEffect(() => {
     const fetchSales = async () => {
@@ -32,32 +33,19 @@ export default function SalesPage() {
     fetchSales();
   }, []);
 
-  // Filter sales based on date
-  const filterSalesByDate = (sale: SaleRecord[]) => {
-    const now = new Date();
-    switch (dateFilter) {
-        case 'today':
-            return sale.filter(sale => {
-                const saleDate = new Date(sale.sale_date);
-                return saleDate.toDateString() === now.toDateString();
-            });
-        case 'week':
-            return sale.filter(sale => {
-                const saleDate = new Date(sale.sale_date);
-                const oneWeekAgo = new Date(now);
-                oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
-                return saleDate >= oneWeekAgo && saleDate <= now;
-            });
-        case 'month':
-            return sale.filter(sale => {
-                const saleDate = new Date(sale.sale_date);
-                const oneMonthAgo = new Date(now);
-                oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
-                return saleDate >= oneMonthAgo && saleDate <= now;
-            });
-        default: // 'all'
-            return sale;
-    }
+// To and From date
+const filterSaleByDate = (sales: SaleRecord[]) => {
+  // If no 'from' date selected, do not filter by date
+  if (!fromDate) return sales;
+
+  // Build date range with safe bounds
+  const from = new Date(fromDate + 'T00:00:00');
+  const to = toDate ? new Date(toDate + 'T23:59:59.999') : new Date('9999-12-31T23:59:59.999');
+
+  return sales.filter((sale) => {
+    const saleDate = new Date(sale.sale_date);
+    return saleDate >= from && saleDate <= to;
+  });
 };
 
   const handleDeleteSale = async (id: number) => {
@@ -106,16 +94,24 @@ export default function SalesPage() {
           />
         </div>
         <div className="flex gap-3">
-        <select 
-                        className="border border-gray-200 rounded-xl px-4 py-3 text-base bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-200"
-                        value={dateFilter}
-                        onChange={(e) => setDateFilter(e.target.value)}
-                    >
-                        <option value="all">All Time</option>
-                        <option value="today">Today</option>
-                        <option value="week">This Week</option>
-                        <option value="month">This Month</option>
-                    </select>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">From</label>
+            <input
+              type="date"
+              value={fromDate}
+              onChange={(e) => setFromDate(e.target.value)}
+              className="w-full px-3 py-2 border rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-200"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">To</label>
+            <input
+              type="date"
+              value={toDate}
+              onChange={(e) => setToDate(e.target.value)}
+              className="w-full px-3 py-2 border rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-200"
+            />
+          </div>
         </div>
       </div>
 
@@ -139,7 +135,7 @@ export default function SalesPage() {
                   </div>
                 </td>
               </tr>
-            ) : filterSalesByDate(sales).filter((sale) => {
+            ) : filterSaleByDate(sales).filter((sale) => {
               const customerName = customers.find((cust) => cust.id === sale.customer_id)?.name?.toLowerCase() || '';
               const searchTerm = search.toLowerCase();
               
@@ -153,7 +149,7 @@ export default function SalesPage() {
                 </td>
               </tr>
             ) : (
-              filterSalesByDate(sales).filter((sale) => {
+              filterSaleByDate(sales).filter((sale) => {
                 const customerName = customers.find((cust) => cust.id === sale.customer_id)?.name?.toLowerCase() || '';
                 const searchTerm = search.toLowerCase();
                 

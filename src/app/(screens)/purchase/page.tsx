@@ -10,7 +10,6 @@ export default function PurchasesPage() {
   const [purchases, setPurchases] = useState<Purchase[]>([]);
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [search, setSearch] = useState('');
-  const [dateFilter, setDateFilter] = useState('all');
   const [loading, setLoading] = useState(false);
   const [fromDate, setFromDate] = useState<string>('');
   const [toDate, setToDate] = useState<string>(new Date().toISOString().split('T')[0]);
