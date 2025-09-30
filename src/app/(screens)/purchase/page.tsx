@@ -1,7 +1,7 @@
 'use client';
 
 import { Search, Plus, FileText, Edit, Trash } from 'lucide-react';
-import {Purchase, Vendor} from '@/types/types';
+import { Purchase, Vendor } from '@/types/types';
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
@@ -12,6 +12,8 @@ export default function PurchasesPage() {
   const [search, setSearch] = useState('');
   const [dateFilter, setDateFilter] = useState('all');
   const [loading, setLoading] = useState(false);
+  const [fromDate, setFromDate] = useState<string>('');
+  const [toDate, setToDate] = useState<string>(new Date().toISOString().split('T')[0]);
 
   useEffect(() => {
     fetchPurchases();
@@ -33,35 +35,22 @@ export default function PurchasesPage() {
     }
   };
 
-  // Filter purchase based on date
-      const filterPurchaseByDate = (purchases: Purchase[]) => {
-          const now = new Date();
-          switch (dateFilter) {
-              case 'today':
-                  return purchases.filter(purchase => {
-                      const purchaseDate = new Date(purchase.purchase_date);
-                      return purchaseDate.toDateString() === now.toDateString();
-                  });
-              case 'week':
-                  return purchases.filter(purchase => {
-                      const purchaseDate = new Date(purchase.purchase_date);
-                      const oneWeekAgo = new Date(now);
-                      oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
-                      return purchaseDate >= oneWeekAgo && purchaseDate <= now;
-                  });
-              case 'month':
-                  return purchases.filter(purchase => {
-                      const purchaseDate = new Date(purchase.purchase_date);
-                      const oneMonthAgo = new Date(now);
-                      oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
-                      return purchaseDate >= oneMonthAgo && purchaseDate <= now;
-                  });
-              default: // 'all'
-                  return purchases;
-          }
-      };
+// To and From date
+const filterPurchaseByDate = (purchases: Purchase[]) => {
+  // If no 'from' date selected, do not filter by date
+  if (!fromDate) return purchases;
 
-const handleDeletePurchase = async (id: number) => {
+  // Build date range with safe bounds
+  const from = new Date(fromDate + 'T00:00:00');
+  const to = toDate ? new Date(toDate + 'T23:59:59.999') : new Date('9999-12-31T23:59:59.999');
+
+  return purchases.filter((purchase) => {
+    const purchaseDate = new Date(purchase.purchase_date);
+    return purchaseDate >= from && purchaseDate <= to;
+  });
+};
+
+  const handleDeletePurchase = async (id: number) => {
     try {
       if (!window.confirm('Are you sure you want to delete this purchase?')) return;
       await fetch(`/api/purchase/${id}`, {
@@ -100,16 +89,24 @@ const handleDeletePurchase = async (id: number) => {
           />
         </div>
         <div className="flex gap-3">
-          <select 
-                        className="border border-gray-200 rounded-xl px-4 py-3 text-base bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-200"
-                        value={dateFilter}
-                        onChange={(e) => setDateFilter(e.target.value)}
-                    >
-                        <option value="all">All Time</option>
-                        <option value="today">Today</option>
-                        <option value="week">This Week</option>
-                        <option value="month">This Month</option>
-                    </select>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">From</label>
+            <input
+              type="date"
+              value={fromDate}
+              onChange={(e) => setFromDate(e.target.value)}
+              className="w-full px-3 py-2 border rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-200"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">To</label>
+            <input
+              type="date"
+              value={toDate}
+              onChange={(e) => setToDate(e.target.value)}
+              className="w-full px-3 py-2 border rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-200"
+            />
+          </div>
         </div>
       </div>
 
@@ -138,10 +135,10 @@ const handleDeletePurchase = async (id: number) => {
               const searchTerm = search.toLowerCase();
               const invoiceStr = (purchase.invoice_number ?? '').toString().toLowerCase();
               const dateStr = (purchase.purchase_date ?? '').toString();
-              
-              return invoiceStr.includes(searchTerm) || 
-                     vendorName.includes(searchTerm) || 
-                     dateStr.includes(search);
+
+              return invoiceStr.includes(searchTerm) ||
+                vendorName.includes(searchTerm) ||
+                dateStr.includes(search);
             }).length === 0 ? (
               <tr>
                 <td colSpan={6} className="px-4 py-8 text-center text-gray-500">
@@ -149,46 +146,46 @@ const handleDeletePurchase = async (id: number) => {
                 </td>
               </tr>
             ) : (
-            filterPurchaseByDate(purchases).filter((purchase) => {
-              const vendorName = vendors.find((vendor) => vendor.id === purchase.vendor_id)?.name?.toLowerCase() || '';
-              const searchTerm = search.toLowerCase();
-              const invoiceStr = (purchase.invoice_number ?? '').toString().toLowerCase();
-              const dateStr = (purchase.purchase_date ?? '').toString();
-              
-              return invoiceStr.includes(searchTerm) || 
-                     vendorName.includes(searchTerm) || 
-                     dateStr.includes(search);
-            }).map((purchase) => (
-              <tr key={purchase.id} className="hover:bg-gray-50">
-                <td className="px-4 py-3">#{purchase.invoice_number}</td>
-                <td className="px-4 py-3">{purchase.purchase_date ? purchase.purchase_date.slice(0, 10) : '-'}</td>
-                <td className="px-4 py-3">{vendors.find(vendor => vendor.id === purchase.vendor_id)?.name}</td>
-                <td className="px-4 py-3 font-semibold">PKR {purchase.total_amount}</td>
-                <td className="px-4 py-3 flex space-x-2">
-                  <button 
-                  className="text-gray-500 hover:text-gray-700" 
-                  title="View Invoice"
-                  onClick={() => router.push(`/purchase/${purchase.id}`)}
-                  >
-                    <FileText size={16} />
-                  </button>
-                  <button 
-                  className="text-gray-500 hover:text-gray-700" 
-                  title="Edit Invoice"
-                  onClick={() => router.push(`/purchase/${purchase.id}/edit`)}
-                  >
-                    <Edit size={16} />
-                  </button>
-                  <button 
-                  className="text-gray-500 hover:text-gray-700" 
-                  title="Delete Invoice"
-                  onClick={() => handleDeletePurchase(purchase.id)}
-                  >
-                    <Trash size={16} />
-                  </button>
-                </td>
-              </tr>
-            )))}
+              filterPurchaseByDate(purchases).filter((purchase) => {
+                const vendorName = vendors.find((vendor) => vendor.id === purchase.vendor_id)?.name?.toLowerCase() || '';
+                const searchTerm = search.toLowerCase();
+                const invoiceStr = (purchase.invoice_number ?? '').toString().toLowerCase();
+                const dateStr = (purchase.purchase_date ?? '').toString();
+
+                return invoiceStr.includes(searchTerm) ||
+                  vendorName.includes(searchTerm) ||
+                  dateStr.includes(search);
+              }).map((purchase) => (
+                <tr key={purchase.id} className="hover:bg-gray-50">
+                  <td className="px-4 py-3">#{purchase.invoice_number}</td>
+                  <td className="px-4 py-3">{purchase.purchase_date ? purchase.purchase_date.slice(0, 10) : '-'}</td>
+                  <td className="px-4 py-3">{vendors.find(vendor => vendor.id === purchase.vendor_id)?.name}</td>
+                  <td className="px-4 py-3 font-semibold">PKR {purchase.total_amount}</td>
+                  <td className="px-4 py-3 flex space-x-2">
+                    <button
+                      className="text-gray-500 hover:text-gray-700"
+                      title="View Invoice"
+                      onClick={() => router.push(`/purchase/${purchase.id}`)}
+                    >
+                      <FileText size={16} />
+                    </button>
+                    <button
+                      className="text-gray-500 hover:text-gray-700"
+                      title="Edit Invoice"
+                      onClick={() => router.push(`/purchase/${purchase.id}/edit`)}
+                    >
+                      <Edit size={16} />
+                    </button>
+                    <button
+                      className="text-gray-500 hover:text-gray-700"
+                      title="Delete Invoice"
+                      onClick={() => handleDeletePurchase(purchase.id)}
+                    >
+                      <Trash size={16} />
+                    </button>
+                  </td>
+                </tr>
+              )))}
           </tbody>
         </table>
       </div>
