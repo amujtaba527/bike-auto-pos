@@ -3,11 +3,18 @@ import { MinusIcon, PlusIcon } from "lucide-react";
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { use } from 'react';
+import dynamic from 'next/dynamic';
+const Select = dynamic(() => import('react-select'), { ssr: false });
+interface Brand {
+  id: number;
+  name: string;
+}
 interface Product {
   id: number;
   name: string;
   sku: string;
   sale_price: number;
+  brand_id: number;
   stock: number;
   quantity: number;
 }
@@ -44,12 +51,14 @@ const EditSale = ({ params }: { params: Promise<{ id: string }> }) => {
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [customers, setCustomers] = useState<Customer[]>([]);
+  const [allbrands, setAllbrands] = useState<Brand[]>([]);
   const [allProducts, setAllProducts] = useState<Product[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [orderDiscount, setOrderDiscount] = useState<number>(0);
   const [orderDiscountType, setOrderDiscountType] = useState<'%' | 'PKR'>('PKR');
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedProductId, setSelectedProductId] = useState<number | null>(null);
+  const [selectedProductOption, setSelectedProductOption] = useState <any> (null);
   const [tempQuantity, setTempQuantity] = useState<number>(1);
   const [customerSearchTerm, setCustomerSearchTerm] = useState("");
   const [loading, setLoading] = useState(false);
@@ -77,6 +86,12 @@ const EditSale = ({ params }: { params: Promise<{ id: string }> }) => {
         const productsRes = await fetch('/api/product');
         const productsData = await productsRes.json();
         const allProductsData = Array.isArray(productsData) ? productsData : productsData.products || [];
+
+        // Fetch brands
+        const brandsRes = await fetch('/api/brand');
+        const brandsData = await brandsRes.json();
+        const allBrandsData = Array.isArray(brandsData) ? brandsData : brandsData.brands || [];
+        setAllbrands(allBrandsData);
         
         // Set form data
         setInvoiceNumber(saleData.sale.invoice_number);
@@ -99,6 +114,7 @@ const EditSale = ({ params }: { params: Promise<{ id: string }> }) => {
             sale_price: item.unit_price,
             stock: product?.stock || 0,
             quantity: item.quantity,
+            brand_id: product?.brand_id || 0,
           };
         });
         
@@ -137,6 +153,7 @@ const EditSale = ({ params }: { params: Promise<{ id: string }> }) => {
         sale_price: prod.sale_price || 0,
         stock: prod.stock || 0,
         quantity: tempQuantity,
+        brand_id: prod.brand_id || 0,
       };
       setProducts([...products, newProduct]);
     }
@@ -319,43 +336,22 @@ const EditSale = ({ params }: { params: Promise<{ id: string }> }) => {
             <h2 className="text-lg font-semibold text-gray-800 mb-4">Add Products</h2>
             <div className="flex gap-3 mb-4">
               <div className="flex-1 relative">
-                <input
-                  type="text"
-                  placeholder="Search products by name or SKU..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-                {searchTerm && (
-                  <div className="absolute top-full left-0 right-0 bg-white border border-gray-300 rounded-lg mt-1 max-h-48 overflow-y-auto z-10">
-                    {allProducts
-                      .filter(p => 
-                        p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                        p.sku.toLowerCase().includes(searchTerm.toLowerCase())
-                      )
-                      .slice(0, 10)
-                      .map(product => (
-                        <button
-                          key={product.id}
-                          onClick={() => setSelectedProductId(product.id)}
-                          className={`w-full text-left px-4 py-3 hover:bg-gray-50 border-b border-gray-100 last:border-b-0 ${
-                            selectedProductId === product.id ? 'bg-blue-50' : ''
-                          }`}
-                        >
-                          <div className="flex justify-between items-center">
-                            <div>
-                              <div className="font-medium">{product.name}</div>
-                              <div className="text-sm text-gray-500">SKU: {product.sku} • Stock: {product.stock}</div>
-                            </div>
-                            <div className="text-right">
-                              <div className="font-medium">PKR {product.sale_price}</div>
-                            </div>
-                          </div>
-                        </button>
-                      ))
-                    }
-                  </div>
-                )}
+                <Select
+                    options={allProducts.map(product => ({
+                      value: product.id,
+                      label: `${product.name} (SKU: ${product.sku}, PKR ${product.sale_price}, Brand: ${allbrands.find(b => b.id === product.brand_id)?.name})`,
+                      ...product
+                    }))}
+                    value={selectedProductOption}
+                    onChange={(option: any) => {
+                      if (!option) return;
+                      setSelectedProductOption(option);
+                      setSelectedProductId(option.value);
+                    }}
+                    placeholder="Search or select a product..."
+                    isSearchable
+                    classNamePrefix="react-select"
+                  />
               </div>
               <div className="flex items-center gap-2">
                 <button
@@ -417,7 +413,7 @@ const EditSale = ({ params }: { params: Promise<{ id: string }> }) => {
                         <tr key={product.id} className="border-b border-gray-100">
                           <td className="py-4 px-4">
                             <div className="font-medium text-gray-900">{product.name}</div>
-                            <div className="text-sm text-gray-500">Stock: {product.stock}</div>
+                            <div className="text-sm text-gray-500">Brand: {allbrands.find(b => b.id === product.brand_id)?.name}</div>
                           </td>
                           <td className="py-4 px-4 text-gray-600">{product.sku}</td>
                           <td className="py-4 px-4">
@@ -452,7 +448,7 @@ const EditSale = ({ params }: { params: Promise<{ id: string }> }) => {
                               value={product.sale_price}
                               onChange={(e) => updateProduct(product.id, 'sale_price', Number(e.target.value) || 0)}
                               className="w-24 px-2 py-1 text-right border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                              step="0.01"
+                              step="1"
                               min="0"
                             />
                           </td>
