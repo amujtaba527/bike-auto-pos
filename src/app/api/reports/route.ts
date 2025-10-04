@@ -41,8 +41,8 @@ export async function GET(request: Request) {
           );
         }
         return await getVendorReport(client, vendorId, startDate, endDate);
-      case 'sales-purchase':
-        return await getSalesPurchaseReport(client, startDate, endDate);
+      case 'sales':
+        return await getSalesReport(client, startDate, endDate);
       default:
         return NextResponse.json({
           success: true,
@@ -51,7 +51,7 @@ export async function GET(request: Request) {
             'balance-sheet',
             'customer-report',
             'vendor-report',
-            'sales-purchase'
+            'sales'
           ]
         });
     }
@@ -366,63 +366,62 @@ async function getVendorReport(client: any, vendorId: string, startDate: string 
   });
 }
 
-// Sales & Purchase Report
-async function getSalesPurchaseReport(client: any, startDate: string | null, endDate: string | null) {
+// Sales Report
+async function getSalesReport(client: any, startDate: string | null, endDate: string | null) {
   const formattedStartDate = formatDate(startDate);
   const formattedEndDate = formatDate(endDate);
 
-  // Build date filters for each table independently
+  // Build date filters for sales
   let salesDateFilter = '';
-  let purchasesDateFilter = '';
   const salesParams: any[] = [];
-  const purchasesParams: any[] = [];
 
   if (formattedStartDate && formattedEndDate) {
     salesDateFilter = 'WHERE DATE(s.sale_date) BETWEEN $1 AND $2';
-    purchasesDateFilter = 'WHERE DATE(p.purchase_date) BETWEEN $1 AND $2';
     salesParams.push(formattedStartDate, formattedEndDate);
-    purchasesParams.push(formattedStartDate, formattedEndDate);
   } else if (formattedStartDate) {
     salesDateFilter = 'WHERE DATE(s.sale_date) >= $1';
-    purchasesDateFilter = 'WHERE DATE(p.purchase_date) >= $1';
     salesParams.push(formattedStartDate);
-    purchasesParams.push(formattedStartDate);
   } else if (formattedEndDate) {
     salesDateFilter = 'WHERE DATE(s.sale_date) <= $1';
-    purchasesDateFilter = 'WHERE DATE(p.purchase_date) <= $1';
     salesParams.push(formattedEndDate);
-    purchasesParams.push(formattedEndDate);
   }
 
+  // Total Sales
   const totalSalesQuery = `
     SELECT COALESCE(SUM(s.total_amount), 0) AS total_sale
     FROM sales s
     ${salesDateFilter}
   `;
 
-  const totalPurchasesQuery = `
-    SELECT COALESCE(SUM(p.total_amount), 0) AS total_purchase
-    FROM purchases p
-    ${purchasesDateFilter}
+  // Cost of Goods Sold
+  const COGSQuery = `
+    SELECT COALESCE(SUM(g.debit_amount), 0) AS total_cogs
+    FROM general_ledger g
+    JOIN sales s ON g.reference_id = s.id
+    WHERE g.account_id = 10
+    ${salesDateFilter ? salesDateFilter.replace('WHERE', 'AND') : ''}
   `;
 
+  // Transactions list
   const transactionsQuery = `
     SELECT * FROM (
-      SELECT 'sale' AS type, s.invoice_number AS invoice, s.total_amount AS price, s.sale_date AS date
-      FROM sales s
-      ${salesDateFilter}
-      UNION ALL
-      SELECT 'purchase' AS type, p.invoice_number AS invoice, p.total_amount AS price, p.purchase_date AS date
-      FROM purchases p
-      ${purchasesDateFilter}
+      SELECT 
+        'sale' AS type, 
+        s.invoice_number AS invoice, 
+        s.total_amount AS price, 
+        s.sale_date AS date, 
+        g.debit_amount AS cogs
+      FROM sales s 
+      JOIN general_ledger g ON s.id = g.reference_id
+      WHERE g.account_id = 10
+      ${salesDateFilter ? salesDateFilter.replace('WHERE', 'AND') : ''}
     ) t
     ORDER BY date DESC
   `;
 
-  const [salesTotalRes, purchaseTotalRes, transactionsRes] = await Promise.all([
+  const [salesTotalRes, COGSRes, transactionsRes] = await Promise.all([
     client.query(totalSalesQuery, salesParams),
-    client.query(totalPurchasesQuery, purchasesParams),
-    // Use the same parameter placeholders for both subqueries; pass salesParams once
+    client.query(COGSQuery, salesParams),
     (async () => {
       if (salesParams.length > 0) {
         return client.query(transactionsQuery, salesParams);
@@ -432,13 +431,13 @@ async function getSalesPurchaseReport(client: any, startDate: string | null, end
   ]);
 
   const total_sale = parseFloat(salesTotalRes.rows[0].total_sale);
-  const total_purchase = parseFloat(purchaseTotalRes.rows[0].total_purchase);
-  const gross_profit = total_sale - total_purchase;
+  const total_cogs = parseFloat(COGSRes.rows[0].total_cogs);
+  const gross_profit = total_sale - total_cogs;
 
   return NextResponse.json({
     success: true,
-    reportType: 'sales-purchase',
-    summary: { total_sale, total_purchase, gross_profit },
+    reportType: 'sales',
+    summary: { total_sale, total_cogs, gross_profit },
     transactions: transactionsRes.rows,
     dateRange: { startDate: formattedStartDate, endDate: formattedEndDate }
   });

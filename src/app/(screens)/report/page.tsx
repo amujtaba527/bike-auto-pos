@@ -1,6 +1,9 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import DatePicker from "react-datepicker";
+
+import "react-datepicker/dist/react-datepicker.css";
 
 // Define TypeScript interfaces
 interface ProfitLossData {
@@ -60,30 +63,29 @@ interface VendorData {
   transactions: any[];
 }
 
-interface SalesPurchaseSummary {
+interface SalesSummary {
   total_sale: number;
-  total_purchase: number;
+  total_cogs: number;
   gross_profit: number;
 }
 
-interface SalesPurchaseTransaction {
-  type: 'sale' | 'purchase';
+interface SalesTransaction {
+  type: 'sale';
   invoice: string;
   price: number;
+  cogs: number;
   date: string;
 }
 
-interface SalesPurchaseData {
-  summary: SalesPurchaseSummary;
-  transactions: SalesPurchaseTransaction[];
+interface SalesData {
+  summary: SalesSummary;
+  transactions: SalesTransaction[];
 }
 
 const ReportsPage = () => {
   const [activeTab, setActiveTab] = useState('profit-loss');
-  const [dateRange, setDateRange] = useState({
-    startDate: new Date(new Date().setDate(new Date().getDate() - 30)).toISOString().split('T')[0],
-    endDate: new Date().toISOString().split('T')[0]
-  });
+  const [startDate, setStartDate] = useState(new Date(new Date().setDate(new Date().getDate() - 30)));
+  const [endDate, setEndDate] = useState(new Date());
   const [customerId, setCustomerId] = useState('');
   const [vendorId, setVendorId] = useState('');
   const [loading, setLoading] = useState(false);
@@ -94,7 +96,7 @@ const ReportsPage = () => {
   const [balanceSheetData, setBalanceSheetData] = useState<BalanceSheetData | null>(null);
   const [customerData, setCustomerData] = useState<CustomerData | null>(null);
   const [vendorData, setVendorData] = useState<VendorData | null>(null);
-  const [salesPurchaseData, setSalesPurchaseData] = useState<SalesPurchaseData | null>(null);
+  const [salesData, setSalesData] = useState<SalesData | null>(null);
   
   // Format currency
   const formatCurrency = (value: number): string => {
@@ -109,7 +111,7 @@ const ReportsPage = () => {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`/api/reports?type=profit-loss&startDate=${dateRange.startDate}&endDate=${dateRange.endDate}`);
+      const res = await fetch(`/api/reports?type=profit-loss&startDate=${startDate}&endDate=${endDate}`);
       const data = await res.json();
       if (data.success) {
         setProfitLossData(data.data);
@@ -151,7 +153,7 @@ const ReportsPage = () => {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`/api/reports?type=customer-report&customerId=${customerId}&startDate=${dateRange.startDate}&endDate=${dateRange.endDate}`);
+      const res = await fetch(`/api/reports?type=customer-report&customerId=${customerId}&startDate=${startDate}&endDate=${endDate}`);
       const data = await res.json();
       if (data.success) {
         setCustomerData(data);
@@ -174,7 +176,7 @@ const ReportsPage = () => {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`/api/reports?type=vendor-report&vendorId=${vendorId}&startDate=${dateRange.startDate}&endDate=${dateRange.endDate}`);
+      const res = await fetch(`/api/reports?type=vendor-report&vendorId=${vendorId}&startDate=${startDate}&endDate=${endDate}`);
       const data = await res.json();
       if (data.success) {
         setVendorData(data);
@@ -188,15 +190,15 @@ const ReportsPage = () => {
     }
   };
 
-  // Fetch Sales & Purchase Report
-  const fetchSalesPurchaseReport = async () => {
+  // Fetch Sales Report
+  const fetchSalesReport = async () => {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`/api/reports?type=sales-purchase&startDate=${dateRange.startDate}&endDate=${dateRange.endDate}`);
+      const res = await fetch(`/api/reports?type=sales&startDate=${startDate}&endDate=${endDate}`);
       const data = await res.json();
       if (data.success) {
-        setSalesPurchaseData({ summary: data.summary, transactions: data.transactions });
+        setSalesData({ summary: data.summary, transactions: data.transactions });
       } else {
         setError(data.error || 'Failed to fetch sale report');
       }
@@ -223,8 +225,8 @@ const ReportsPage = () => {
       case 'balance-sheet':
         fetchBalanceSheet();
         break;
-      case 'sales-purchase':
-        setSalesPurchaseData(null);
+      case 'sales':
+        fetchSalesReport();
         break;
       case 'customer':
         setCustomerData(null);
@@ -235,32 +237,30 @@ const ReportsPage = () => {
     }
   };
 
-  // Sale & Purchase Report Component
-  const SalePurchaseReport = () => (
+  // Sale Report Component
+  const SaleReport = () => (
     <div className="bg-white rounded-lg shadow p-6">
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-bold text-gray-900">Sale Report</h2>
         <div className="flex gap-4 items-end">
           <div>
             <label className="block text-sm font-medium text-gray-700">From</label>
-            <input
-              type="date"
-              value={dateRange.startDate}
-              onChange={(e) => setDateRange({ ...dateRange, startDate: e.target.value })}
+            <DatePicker
+              selected={startDate}
+              onChange={(date) => setStartDate(date||new Date())}
               className="mt-1 border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700">To</label>
-            <input
-              type="date"
-              value={dateRange.endDate}
-              onChange={(e) => setDateRange({ ...dateRange, endDate: e.target.value })}
+            <DatePicker
+              selected={endDate}
+              onChange={(date) => setEndDate(date||new Date())}
               className="mt-1 border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
           <button
-            onClick={fetchSalesPurchaseReport}
+            onClick={fetchSalesReport}
             disabled={loading}
             className="h-10 bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-md transition duration-150 ease-in-out disabled:opacity-50"
           >
@@ -269,28 +269,28 @@ const ReportsPage = () => {
         </div>
       </div>
 
-      {error && activeTab === 'sales-purchase' && (
+      {error && activeTab === 'sales' && (
         <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
           <div className="text-red-800">{error}</div>
         </div>
       )}
 
-      {salesPurchaseData && (
+      {salesData && (
         <>
           {/* Summary Cards */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
             <div className="bg-green-50 rounded-lg p-4">
               <p className="text-sm text-gray-500">Total Sale</p>
-              <p className="text-2xl font-bold text-green-700">{formatCurrency(salesPurchaseData.summary.total_sale)}</p>
+              <p className="text-2xl font-bold text-green-700">{formatCurrency(salesData.summary.total_sale)}</p>
             </div>
             <div className="bg-blue-50 rounded-lg p-4">
-              <p className="text-sm text-gray-500">Total Purchase</p>
-              <p className="text-2xl font-bold text-blue-700">{formatCurrency(salesPurchaseData.summary.total_purchase)}</p>
+              <p className="text-sm text-gray-500">Cost of Goods Sold</p>
+              <p className="text-2xl font-bold text-blue-700">{formatCurrency(salesData.summary.total_cogs)}</p>
             </div>
             <div className="bg-purple-50 rounded-lg p-4">
               <p className="text-sm text-gray-500">Gross Profit</p>
-              <p className={`text-2xl font-bold ${salesPurchaseData.summary.gross_profit >= 0 ? 'text-purple-700' : 'text-red-600'}`}>
-                {formatCurrency(salesPurchaseData.summary.gross_profit)}
+              <p className={`text-2xl font-bold ${salesData.summary.gross_profit >= 0 ? 'text-purple-700' : 'text-red-600'}`}>
+                {formatCurrency(salesData.summary.gross_profit)}
               </p>
             </div>
           </div>
@@ -304,20 +304,24 @@ const ReportsPage = () => {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Invoice</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Price</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">COGS</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Gross Profit</th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {salesPurchaseData.transactions.map((t, idx) => (
+                {salesData.transactions.map((t, idx) => (
                   <tr key={idx}>
                     <td className="px-4 py-3">
-                      <span className={`px-2 py-1 rounded-full text-xs font-semibold ${t.type === 'sale' ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700'}`}>
-                        {t.type === 'sale' ? 'Sale' : 'Purchase'}
+                      <span className={`px-2 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700`}>
+                        Sale
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{t.invoice}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{formatCurrency(Number(t.price))}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{formatCurrency(Number(t.cogs))}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{new Date(t.date).toLocaleDateString()}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{formatCurrency(Number(t.price) - Number(t.cogs))}</td>
                   </tr>
                 ))}
               </tbody>
@@ -336,19 +340,17 @@ const ReportsPage = () => {
         <div className="flex gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700">Start Date</label>
-            <input
-              type="date"
-              value={dateRange.startDate}
-              onChange={(e) => setDateRange({ ...dateRange, startDate: e.target.value })}
+            <DatePicker
+              selected={startDate}
+              onChange={(date) => setStartDate(date||new Date())}
               className="mt-1 border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700">End Date</label>
-            <input
-              type="date"
-              value={dateRange.endDate}
-              onChange={(e) => setDateRange({ ...dateRange, endDate: e.target.value })}
+            <DatePicker
+              selected={endDate}
+              onChange={(date) => setEndDate(date||new Date())}
               className="mt-1 border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
@@ -514,19 +516,17 @@ const ReportsPage = () => {
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700">Start Date</label>
-            <input
-              type="date"
-              value={dateRange.startDate}
-              onChange={(e) => setDateRange({ ...dateRange, startDate: e.target.value })}
+            <DatePicker
+              selected={startDate}
+              onChange={(date) => setStartDate(date||new Date())}
               className="mt-1 border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700">End Date</label>
-            <input
-              type="date"
-              value={dateRange.endDate}
-              onChange={(e) => setDateRange({ ...dateRange, endDate: e.target.value })}
+            <DatePicker
+              selected={endDate}
+              onChange={(date) => setEndDate(date||new Date())}
               className="mt-1 border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
@@ -635,19 +635,17 @@ const ReportsPage = () => {
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700">Start Date</label>
-            <input
-              type="date"
-              value={dateRange.startDate}
-              onChange={(e) => setDateRange({ ...dateRange, startDate: e.target.value })}
+            <DatePicker
+              selected={startDate}
+              onChange={(date) => setStartDate(date||new Date())}
               className="mt-1 border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700">End Date</label>
-            <input
-              type="date"
-              value={dateRange.endDate}
-              onChange={(e) => setDateRange({ ...dateRange, endDate: e.target.value })}
+            <DatePicker
+              selected={endDate}
+              onChange={(date) => setEndDate(date||new Date())}
               className="mt-1 border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
@@ -769,9 +767,9 @@ const ReportsPage = () => {
             Balance Sheet
           </button>
           <button
-            onClick={() => handleTabChange('sales-purchase')}
+            onClick={() => handleTabChange('sales')}
             className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm ${
-              activeTab === 'sales-purchase'
+              activeTab === 'sales'
                 ? 'border-blue-500 text-blue-600'
                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
             }`}
@@ -802,7 +800,7 @@ const ReportsPage = () => {
       </div>
 
       {/* Error Message */}
-      {error && !['customer', 'vendor', 'sales-purchase'].includes(activeTab) && (
+      {error && !['customer', 'vendor', 'sales'].includes(activeTab) && (
         <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
           <div className="text-red-800">{error}</div>
         </div>
@@ -811,7 +809,7 @@ const ReportsPage = () => {
       {/* Report Content */}
       {activeTab === 'profit-loss' && <ProfitLossReport />}
       {activeTab === 'balance-sheet' && <BalanceSheetReport />}
-      {activeTab === 'sales-purchase' && <SalePurchaseReport />}
+      {activeTab === 'sales' && <SaleReport />}
       {activeTab === 'customer' && <CustomerReport />}
       {activeTab === 'vendor' && <VendorReport />}
     </div>
