@@ -81,18 +81,19 @@ export async function POST(req: Request) {
     
     for (const item of body.items) {
       const lineTotal = item.quantity * item.price;
-      // Insert sale item
-      await client.query(
-        "INSERT INTO sales_items (product_id, sale_id, quantity, unit_price, line_total) VALUES ($1, $2, $3, $4, $5)", 
-        [item.product_id, sale_id, item.quantity, item.price, lineTotal]
-      );
-      
+
       // Calculate COGS for this item
       const productResult = await client.query(
         'SELECT cost_price FROM products WHERE id = $1',
         [item.product_id]
       );
-      
+
+      // Insert sale item
+      await client.query(
+        "INSERT INTO sales_items (product_id, sale_id, quantity, unit_price, line_total, cost_price) VALUES ($1, $2, $3, $4, $5, $6)", 
+        [item.product_id, sale_id, item.quantity, item.price, lineTotal, productResult.rows[0].cost_price]
+      );
+    
       const costPrice = productResult.rows[0].cost_price;
       const itemCOGS = item.quantity * costPrice;
       totalCOGS += itemCOGS;
