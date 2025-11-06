@@ -78,6 +78,7 @@ CREATE TABLE sales_items (
     sale_id INT NOT NULL,
     quantity INT NOT NULL,
     unit_price DECIMAL(10, 2) NOT NULL,
+    cost_price DECIMAL(10, 2),
     line_total DECIMAL(10, 2) NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
