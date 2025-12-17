@@ -3,8 +3,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { Brand, Product } from '@/types/types';
-import { Search } from 'lucide-react';
-import { useRouter } from 'next/navigation';
 
 const Select = dynamic(() => import('react-select'), { ssr: false });
 
@@ -20,7 +18,6 @@ interface ReportRow {
 }
 
 const ProductReportPage = () => {
-  const router = useRouter();
   const [brands, setBrands] = useState<Brand[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
 
@@ -249,7 +246,7 @@ const ProductReportPage = () => {
               </tr>
             ) : (
               rows.map((r, idx) => (
-                <tr key={idx} className="hover:bg-gray-50 cursor-pointer" onClick={() => router.push(`/${r.type}/${r.id}/edit`)}>
+                <tr key={idx} className="hover:bg-gray-50 cursor-pointer" onClick={() => window.open(`/${r.type}/${r.id}/edit`, '_blank')}>
                   <td className="px-4 py-3">
                     <span className={`px-2 py-1 rounded-full text-xs font-semibold ${r.type === 'sale' ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700'}`}>
                       {r.type === 'sale' ? 'Sale' : 'Purchase'}
