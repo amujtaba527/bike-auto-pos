@@ -30,6 +30,7 @@ const NAV_CONFIG: NavItem[] = [
       { href: "/product/categories", icon: Plus, text: "Category & Brand" },
       { href: "/product/demand", icon: RotateCcw, text: "Product Demand" },
       { href: "/product/report", icon: ClipboardList, text: "Product Report" },
+      { href: "/product/stockreport", icon: ClipboardList, text: "Stock Report" },
     ]
   },
   {

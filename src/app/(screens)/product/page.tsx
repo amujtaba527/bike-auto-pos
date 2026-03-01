@@ -201,10 +201,10 @@ const Products = () => {
           stock: product.stock,
           description: product.description
         }));
-        const brandres = await fetch('api/brand');
+        const brandres = await fetch('/api/brand');
         const branddata = await brandres.json();
         const brandsArray = Array.isArray(branddata) ? branddata : branddata.brands || [];
-        const categoryres = await fetch('api/category');
+        const categoryres = await fetch('/api/category');
         const categorydata = await categoryres.json();
         const categoriesArray = Array.isArray(categorydata) ? categorydata : categorydata.categories || [];
         setBrands(brandsArray);
