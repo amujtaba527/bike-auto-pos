@@ -1,5 +1,5 @@
 'use client';
-import { Search, ChevronUp, ChevronDown } from 'lucide-react';
+import { Search, ChevronUp, ChevronDown, Package, DollarSign, TrendingUp } from 'lucide-react';
 import React, { useEffect, useState } from 'react';
 import { Product, Brand, Category } from '@/types/types';
 
@@ -109,8 +109,46 @@ const StockReport = () => {
 
     return (
         <div className="max-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-100 p-4 md:p-8 w-full max-w-screen-2xl mx-auto">
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-8 gap-4">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-8 gap-5">
                 <h1 className="text-3xl font-extrabold text-indigo-700 tracking-tight">Stock Report</h1>
+                <div className="flex flex-wrap gap-4">
+                    {/* Total Stock Value Card */}
+                    <div className="flex items-center gap-4 bg-gradient-to-br from-indigo-500 to-indigo-700 text-white rounded-2xl shadow-lg shadow-indigo-200 px-6 py-4 min-w-[220px] transition-transform hover:scale-[1.03]">
+                        <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-white/20 backdrop-blur-sm">
+                            <DollarSign size={26} className="text-white" />
+                        </div>
+                        <div className="flex flex-col">
+                            <span className="text-xs font-medium uppercase tracking-wider text-indigo-100">Total Stock Value</span>
+                            <span className="text-2xl font-bold tracking-tight">
+                                Rs. {sortedFilteredProducts.reduce((acc, product) => acc + product.cost_price * product.stock, 0).toLocaleString()}
+                            </span>
+                        </div>
+                    </div>
+                    {/* Total Stock Quantity Card */}
+                    <div className="flex items-center gap-4 bg-gradient-to-br from-emerald-500 to-emerald-700 text-white rounded-2xl shadow-lg shadow-emerald-200 px-6 py-4 min-w-[220px] transition-transform hover:scale-[1.03]">
+                        <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-white/20 backdrop-blur-sm">
+                            <Package size={26} className="text-white" />
+                        </div>
+                        <div className="flex flex-col">
+                            <span className="text-xs font-medium uppercase tracking-wider text-emerald-100">Total Stock Qty</span>
+                            <span className="text-2xl font-bold tracking-tight">
+                                {sortedFilteredProducts.reduce((acc, product) => acc + product.stock, 0).toLocaleString()}
+                            </span>
+                        </div>
+                    </div>
+                    {/* Total Sale Price Card */}
+                    <div className="flex items-center gap-4 bg-gradient-to-br from-amber-500 to-amber-700 text-white rounded-2xl shadow-lg shadow-amber-200 px-6 py-4 min-w-[220px] transition-transform hover:scale-[1.03]">
+                        <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-white/20 backdrop-blur-sm">
+                            <TrendingUp size={26} className="text-white" />
+                        </div>
+                        <div className="flex flex-col">
+                            <span className="text-xs font-medium uppercase tracking-wider text-amber-100">Total Sale Price</span>
+                            <span className="text-2xl font-bold tracking-tight">
+                                Rs. {sortedFilteredProducts.reduce((acc, product) => acc + product.sale_price * product.stock, 0).toLocaleString()}
+                            </span>
+                        </div>
+                    </div>
+                </div>
             </div>
             <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6 gap-4">
                 <div className="relative w-full md:max-w-md">

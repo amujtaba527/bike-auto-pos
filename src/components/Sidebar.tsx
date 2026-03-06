@@ -40,6 +40,7 @@ const NAV_CONFIG: NavItem[] = [
     subItems: [
       { href: "/sale", icon: ShoppingCart, text: "Sales" },
       { href: "/sale/newsale", icon: Plus, text: "New Sale" },
+      { href: "/sale/quotation", icon: FileText, text: "Sale Quotation" },
       { href: "/sale/return", icon: RotateCcw, text: "Return Sale" }
     ]
   },
@@ -59,6 +60,7 @@ const NAV_CONFIG: NavItem[] = [
     subItems: [
       { href: "/purchase", icon: Package, text: "Purchase" },
       { href: "/purchase/newpurchase", icon: Plus, text: "New Purchase" },
+      { href: "/purchase/quotation", icon: FileText, text: "Purchase Quotation" },
       { href: "/purchase/return", icon: RotateCcw, text: "Return Purchase" }
     ]
   },
