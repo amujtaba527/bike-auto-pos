@@ -5,7 +5,7 @@ import React, { useMemo, useState, useEffect } from 'react';
 import {
   LogOut, Package, Plus, RotateCcw, ShoppingCart, User,
   ClipboardList, Menu, X, ChevronDown, ChevronRight, LayoutDashboard,
-  Receipt, Calculator, FileText
+  Receipt, Calculator, FileText, ScrollText
 } from 'lucide-react';
 
 interface NavItem {
@@ -61,7 +61,8 @@ const NAV_CONFIG: NavItem[] = [
       { href: "/purchase", icon: Package, text: "Purchase" },
       { href: "/purchase/newpurchase", icon: Plus, text: "New Purchase" },
       { href: "/purchase/quotation", icon: FileText, text: "Purchase Quotation" },
-      { href: "/purchase/return", icon: RotateCcw, text: "Return Purchase" }
+      { href: "/purchase/return", icon: RotateCcw, text: "Return Purchase" },
+      { href: "/purchase/purchaselist", icon: ScrollText, text: "Purchase List" }
     ]
   },
   { name: 'Expenses', path: '/expenses', icon: Receipt },

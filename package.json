@@ -15,6 +15,7 @@
     "dotenv": "^17.2.0",
     "html2canvas": "^1.4.1",
     "jspdf": "^3.0.1",
+    "jspdf-autotable": "^5.0.7",
     "lucide-react": "^0.525.0",
     "next": "15.4.8",
     "pg": "^8.16.3",
