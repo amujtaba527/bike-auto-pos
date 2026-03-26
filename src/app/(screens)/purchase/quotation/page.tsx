@@ -52,6 +52,34 @@ const PurchaseQuotation = () => {
                         ...walkInVendor
                     });
                 }
+
+                // Check for pre-selected products from Purchase List page
+                const savedIds = localStorage.getItem('purchaseListSelectedIds');
+                if (savedIds) {
+                    try {
+                        const selectedIds: number[] = JSON.parse(savedIds);
+                        const preSelectedProducts: Product[] = productList
+                            .filter((p: Product) => selectedIds.includes(p.id))
+                            .map((prod: Product) => ({
+                                id: prod.id,
+                                name: prod.name,
+                                sku: prod.sku || '',
+                                cost_price: prod.cost_price || 0,
+                                stock: 1,
+                                sale_price: prod.sale_price || 0,
+                                description: prod.description || '',
+                                min_stock_level: prod.min_stock_level || 0,
+                                brand_id: prod.brand_id || 0,
+                                category_id: prod.category_id || 0,
+                            }));
+                        if (preSelectedProducts.length > 0) {
+                            setProducts(preSelectedProducts);
+                        }
+                    } catch (e) {
+                        console.error('Failed to parse pre-selected products:', e);
+                    }
+                    localStorage.removeItem('purchaseListSelectedIds');
+                }
             })
             .catch(err => {
                 console.error("Failed to fetch initial data:", err);

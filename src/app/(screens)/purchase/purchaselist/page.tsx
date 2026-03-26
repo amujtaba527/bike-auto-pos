@@ -1,11 +1,11 @@
 'use client';
-import { Search, FileDown } from 'lucide-react';
+import { Search, ShoppingCart } from 'lucide-react';
 import React , { useEffect, useState } from 'react';
 import { Product, Brand, Category } from '@/types/types';
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
+import { useRouter } from 'next/navigation';
 
 const PurchaseList = () => {
+  const router = useRouter();
   const [products, setProducts] = useState<Product[]>([]);
   const [brands, setBrands] = useState<Brand[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -72,64 +72,15 @@ const PurchaseList = () => {
     }
   };
 
-  const handleDownloadPdf = () => {
-    const selectedProducts = products.filter(p => selectedIds.has(p.id));
-    if (selectedProducts.length === 0) {
-      alert('Please select at least one product to download.');
+  const handleSendToQuotation = () => {
+    if (selectedIds.size === 0) {
+      alert('Please select at least one product.');
       return;
     }
 
-    const doc = new jsPDF();
-
-    // Title
-    doc.setFontSize(18);
-    doc.setFont('helvetica', 'bold');
-    doc.text('Purchase Order List', 14, 20);
-
-    // Date
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'normal');
-    doc.text(`Generated on: ${new Date().toLocaleDateString()}`, 14, 28);
-
-    // Table
-    const tableData = selectedProducts.map((product, index) => [
-      index + 1,
-      product.sku,
-      product.name,
-      brands.find(b => b.id === product.brand_id)?.name || '-',
-      categories.find(c => c.id === product.category_id)?.name || '-',
-      `PKR ${product.cost_price.toLocaleString()}`,
-    ]);
-
-    autoTable(doc, {
-      startY: 34,
-      head: [['#', 'SKU', 'Product Name', 'Brand', 'Category', 'Cost Price']],
-      body: tableData,
-      theme: 'grid',
-      headStyles: {
-        fillColor: [67, 56, 202],
-        textColor: 255,
-        fontStyle: 'bold',
-        fontSize: 10,
-      },
-      bodyStyles: {
-        fontSize: 9,
-      },
-      alternateRowStyles: {
-        fillColor: [245, 247, 255],
-      },
-      styles: {
-        cellPadding: 3,
-      },
-    });
-
-    // Total
-    const finalY = (doc as jsPDF & { lastAutoTable: { finalY: number } }).lastAutoTable.finalY;
-    doc.setFontSize(11);
-    doc.setFont('helvetica', 'bold');
-    doc.text(`Total Items: ${selectedProducts.length}`, 14, finalY + 10);
-
-    doc.save(`Purchase_List_${new Date().toISOString().slice(0, 10)}.pdf`);
+    // Save selected product IDs to localStorage for the quotation page to pick up
+    localStorage.setItem('purchaseListSelectedIds', JSON.stringify(Array.from(selectedIds)));
+    router.push('/purchase/quotation');
   };
 
   return (
@@ -156,11 +107,11 @@ const PurchaseList = () => {
             </span>
           )}
           <button
-            onClick={handleDownloadPdf}
-            className="bg-amber-800 hover:bg-amber-900 transition-colors text-white px-4 py-2 rounded flex items-center space-x-2"
+            onClick={handleSendToQuotation}
+            className="bg-indigo-600 hover:bg-indigo-700 transition-colors text-white px-5 py-2.5 rounded-lg flex items-center space-x-2 font-medium shadow-sm"
           >
-            <FileDown />
-            <span>Download Pdf</span>
+            <ShoppingCart size={18} />
+            <span>Send to Quotation</span>
           </button>
         </div>
       </div>
